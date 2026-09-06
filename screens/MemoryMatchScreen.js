@@ -1,177 +1,158 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Dimensions, Animated, StatusBar, Platform, ScrollView,
+  Dimensions, Animated, StatusBar, ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { playClick, playSuccess } from '../utils/audioManager';
 
-const { width: SW } = Dimensions.get('window');
+const { width: SW, height: SH } = Dimensions.get('window');
 
-// ── Emoji pools ────────────────────────────────────────────────────────────
-const ALL_EMOJIS = [
-  '🐶','🐱','🦊','🐻','🐼','🦁','🐮','🐷',
-  '🐸','🦋','🐬','🦄','🦖','🦈','🐙','🦀',
-  '🐧','🦔','🦜','🐝','🦩','🐳','🦚','🐞',
+// ── Themes & Icons ────────────────────────────────────────────────────────
+const THEMES = {
+  ANIMALS: ['🐶','🐱','🐮','🐴','🐷','🐑','🐘','🐰','🐦','🦆','🦉','🐧','🕷️','🐠','🐢','🐛','🐝','🐞','🐌','🐬','🦘','🐨','🐼','🦋'],
+  FOOD:    ['🍎','🥕','🍕','🍔','🍦','☕','🧁','🍭','🎂','🍜','🥐','🍗','🌭','🥩','🍒','🍇','🍍','🍉','🍄','🥜','🌶️','🥖','🌮','🍿'],
+  VEHICLES:['🚗','🏎️','🚌','✈️','🚂','🚲','🛵','🏍️','🚁','🚀','⛵','🛳️','🚚','🚜','🚑','🚒','🚇','🚕','🚐','🛺','🛻','🚊','🚐','🚌'],
+  SPORTS:  ['⚽','🏀','🎾','🏈','⚾','⛳','🏐','🏓','🎳','🎱','🏏','🏒','🛹','🏂','⛷️','🏊','🥋','🏋️','🤸','🏅','🏆','🎯','🎙️','💪'],
+  NATURE:  ['☀️','🌧️','❄️','☁️','⚡','💨','🌙','🌨️','🔥','💧','🍃','🌲','🌲','🌷','🌸','🌍','🌙','⭐','☁️','🌈','☂️','🏔️','🧭','🌅']
+};
+const THEME_KEYS = Object.keys(THEMES);
+
+// ── Levels ────────────────────────────────────────────────────────────────
+const RAW = [
+  // 1-10: 8 pairs (4x4 grid - much smaller cells than 3x4)
+  [1,8,4], [2,8,4], [3,8,4], [4,8,4], [5,8,4], [6,8,4], [7,8,4], [8,8,4], [9,8,4], [10,8,4],
+  // 11-20: 10 pairs (4x5 grid)
+  [11,10,4], [12,10,4], [13,10,4], [14,10,4], [15,10,4], [16,10,4], [17,10,4], [18,10,4], [19,10,4], [20,10,4],
+  // 21-30: 12 pairs (4x6 grid)
+  [21,12,4], [22,12,4], [23,12,4], [24,12,4], [25,12,4], [26,12,4], [27,12,4], [28,12,4], [29,12,4], [30,12,4],
+  // 31-40: 15 pairs (5x6 grid - very small cells)
+  [31,15,5], [32,15,5], [33,15,5], [34,15,5], [35,15,5], [36,15,5], [37,15,5], [38,15,5], [39,15,5], [40,15,5],
+  // 41-50: 18 pairs (6x6 grid)
+  [41,18,6], [42,18,6], [43,18,6], [44,18,6], [45,18,6], [46,18,6], [47,18,6], [48,18,6], [49,18,6], [50,18,6],
 ];
 
-const MODES = [
-  { key: 'easy',   label: '4 × 4', cols: 4, pairs: 8,  emoji: '🟢' },
-  { key: 'medium', label: '5 × 4', cols: 5, pairs: 10, emoji: '🟡' },
-  { key: 'hard',   label: '6 × 6', cols: 6, pairs: 18, emoji: '🔴' },
-];
+const LEVELS = RAW.map(([level, pairs, cols]) => ({
+  level, pairs, cols,
+  theme: THEME_KEYS[(level - 1) % THEME_KEYS.length],
+  timeLimit: 30 + (level * 5), // dynamic time limit
+}));
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-function buildDeck(pairs) {
-  const pool = ALL_EMOJIS.slice(0, pairs);
-  const deck = [...pool, ...pool]
-    .sort(() => Math.random() - 0.5)
-    .map((emoji, i) => ({ id: i, emoji, flipped: false, matched: false }));
-  return deck;
+// ── Helpers ───────────────────────────────────────────────────────────────
+function buildDeck(pairs, themeKey) {
+  const icons = THEMES[themeKey] || THEMES.NATURE;
+  const pool = icons.slice(0, pairs);
+  return [...pool, ...pool]
+    .map((iconName, idx) => ({ id: idx, iconName, flipped: false, matched: false }))
+    .sort(() => Math.random() - 0.5);
 }
 
-function formatTime(s) {
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  return `${m}:${sec.toString().padStart(2, '0')}`;
-}
 
-// ── Card component ─────────────────────────────────────────────────────────
+// ── Memory Card ───────────────────────────────────────────────────────────
 function MemoryCard({ card, size, onPress, scaleAnim, disabled }) {
   const isVisible = card.flipped || card.matched;
+  const br = size * 0.15;
 
   return (
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.85}
       disabled={disabled || card.matched || card.flipped}
-      style={{ padding: size * 0.04 }}
+      style={{ padding: Math.max(2, size * 0.05) }}
     >
-      <Animated.View style={[{ transform: [{ scaleX: scaleAnim }] }]}>
+      <Animated.View style={{ transform: [{ scaleX: scaleAnim }] }}>
         {isVisible ? (
-          /* Face up */
           <View style={[
-            styles.cardFront,
-            { width: size, height: size, borderRadius: size * 0.18 },
-            card.matched && styles.cardMatched,
+            cardStyles.front,
+            { width: size, height: size, borderRadius: br },
+            card.matched && { opacity: 0.6 },
           ]}>
-            {card.matched && (
-              <LinearGradient
-                colors={['rgba(105,240,174,0.2)','rgba(0,230,118,0.1)']}
-                style={[StyleSheet.absoluteFill, { borderRadius: size * 0.18 }]}
-              />
-            )}
-            <Text style={{ fontSize: size * 0.44, lineHeight: size * 0.56 }}>{card.emoji}</Text>
-            {card.matched && (
-              <View style={styles.matchTick}>
-                <Text style={styles.matchTickText}>✓</Text>
-              </View>
-            )}
+            <Text style={{ fontSize: size * 0.55, textAlign: 'center', includeFontPadding: false }}>
+              {card.iconName}
+            </Text>
           </View>
         ) : (
-          /* Face down */
-          <LinearGradient
-            colors={['#4A148C', '#7B1FA2', '#9C27B0']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={[styles.cardBack, { width: size, height: size, borderRadius: size * 0.18 }]}
-          >
-            {/* Pattern dots */}
-            <View style={styles.cardPattern}>
-              {[0,1,2,3].map(i => (
-                <View key={i} style={[styles.patternDot, { opacity: 0.15 + i * 0.05 }]} />
-              ))}
-            </View>
-            <Text style={[styles.cardQ, { fontSize: size * 0.35 }]}>✦</Text>
-          </LinearGradient>
+          <View style={[cardStyles.back, { width: size, height: size, borderRadius: br }]}>
+            {/* Inner highlight for 3D bevel effect */}
+            <View style={[StyleSheet.absoluteFill, cardStyles.backInner]} />
+            <Text style={[cardStyles.qMark, { fontSize: size * 0.6 }]}>?</Text>
+          </View>
         )}
       </Animated.View>
     </TouchableOpacity>
   );
 }
 
-// ── Main screen ────────────────────────────────────────────────────────────
-export default function MemoryMatchScreen({ onBack }) {
-  const [mode,       setMode]       = useState(MODES[0]);
-  const [cards,      setCards]      = useState(() => buildDeck(MODES[0].pairs));
-  const [selected,   setSelected]   = useState([]);   // indices of flipped (unmatched) cards
-  const [canFlip,    setCanFlip]    = useState(true);
-  const [moves,      setMoves]      = useState(0);
-  const [matched,    setMatched]    = useState(0);
-  const [timer,      setTimer]      = useState(0);
-  const [running,    setRunning]    = useState(false);
-  const [complete,   setComplete]   = useState(false);
-  const [bestTimes,  setBestTimes]  = useState({ easy: null, medium: null, hard: null });
-  const [showModes,  setShowModes]  = useState(false);
+let globalUnlockedLevel = 1;
 
-  // One Animated.Value per card slot
+// ── Main Screen ───────────────────────────────────────────────────────────
+export default function MatchmakerScreen({ onBack }) {
+  const [view, setView] = useState('start'); // 'start' | 'game' | 'levels'
+  const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
+  const [maxUnlockedLevel, setMaxUnlockedLevel] = useState(globalUnlockedLevel);
+  const [bestScore, setBestScore] = useState(0); // arbitrary scoring for UI
+  const [score, setScore] = useState(0);
+
+  // Game state
+  const [cards, setCards] = useState([]);
+  const [selected, setSelected] = useState([]);
+  const [canFlip, setCanFlip] = useState(true);
+  const [matched, setMatched] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [running, setRunning] = useState(false);
+  const [complete, setComplete] = useState(false);
+
   const cardAnims = useRef([]);
-  if (cardAnims.current.length !== cards.length) {
-    cardAnims.current = cards.map(() => new Animated.Value(1));
-  }
 
-  // Animations for win screen
-  const winScale = useRef(new Animated.Value(0)).current;
-  const winOp    = useRef(new Animated.Value(0)).current;
-  // Header entrance
-  const hdrY  = useRef(new Animated.Value(-20)).current;
-  const hdrO  = useRef(new Animated.Value(0)).current;
-
-  // Pulsing star for unflipped cards
-  const starPulse = useRef(new Animated.Value(1)).current;
+  // Timer removed for now
   useEffect(() => {
-    Animated.loop(Animated.sequence([
-      Animated.timing(starPulse, { toValue: 0.7, duration: 1200, useNativeDriver: true }),
-      Animated.timing(starPulse, { toValue: 1.0, duration: 1200, useNativeDriver: true }),
-    ])).start();
-  }, []);
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.spring(hdrY, { toValue: 0, friction: 7, useNativeDriver: true }),
-      Animated.timing(hdrO, { toValue: 1, duration: 300, useNativeDriver: true }),
-    ]).start();
-  }, []);
-
-  // Timer
-  const timerRef = useRef(null);
-  useEffect(() => {
-    if (running && !complete) {
-      timerRef.current = setInterval(() => setTimer(t => t + 1), 1000);
-    } else {
-      clearInterval(timerRef.current);
-    }
-    return () => clearInterval(timerRef.current);
+    // No timer logic
   }, [running, complete]);
 
-  // ── Flip animation helper ─────────────────────────────────────────────
-  const flipAnim = useCallback((idx, callback) => {
-    const anim = cardAnims.current[idx];
-    Animated.sequence([
-      Animated.timing(anim, { toValue: 0, duration: 140, useNativeDriver: true }),
-      Animated.timing(anim, { toValue: 1, duration: 140, useNativeDriver: true }),
-    ]).start(callback);
+  const cfg = LEVELS[currentLevelIdx] || LEVELS[0];
+
+  const startLevel = useCallback((levelNum) => {
+    const idx = levelNum - 1;
+    const lcfg = LEVELS[idx];
+    const deck = buildDeck(lcfg.pairs, lcfg.theme);
+    setCurrentLevelIdx(idx);
+    setCards(deck);
+    cardAnims.current = deck.map(() => new Animated.Value(1));
+    setSelected([]); setCanFlip(true);
+    setMatched(0); setScore(0);
+    setTimeLeft(lcfg.timeLimit);
+    setRunning(true); setComplete(false);
+    setView('game');
   }, []);
 
-  const flipBackAnims = useCallback((idxA, idxB, afterFlip) => {
+  const flipAnim = useCallback((idx, cb) => {
+    const anim = cardAnims.current[idx];
+    if (!anim) { cb?.(); return; }
+    Animated.sequence([
+      Animated.timing(anim, { toValue: 0, duration: 120, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: 1, duration: 120, useNativeDriver: true }),
+    ]).start(cb);
+  }, []);
+
+  const flipBackBoth = useCallback((a, b, cb) => {
+    if (!cardAnims.current[a] || !cardAnims.current[b]) { cb?.(); return; }
     Animated.parallel([
       Animated.sequence([
-        Animated.timing(cardAnims.current[idxA], { toValue: 0, duration: 140, useNativeDriver: true }),
-        Animated.timing(cardAnims.current[idxA], { toValue: 1, duration: 140, useNativeDriver: true }),
+        Animated.timing(cardAnims.current[a], { toValue: 0, duration: 120, useNativeDriver: true }),
+        Animated.timing(cardAnims.current[a], { toValue: 1, duration: 120, useNativeDriver: true }),
       ]),
       Animated.sequence([
-        Animated.timing(cardAnims.current[idxB], { toValue: 0, duration: 140, useNativeDriver: true }),
-        Animated.timing(cardAnims.current[idxB], { toValue: 1, duration: 140, useNativeDriver: true }),
+        Animated.timing(cardAnims.current[b], { toValue: 0, duration: 120, useNativeDriver: true }),
+        Animated.timing(cardAnims.current[b], { toValue: 1, duration: 120, useNativeDriver: true }),
       ]),
-    ]).start(afterFlip);
+    ]).start(cb);
   }, []);
 
-  // ── Card tap ──────────────────────────────────────────────────────────
   const handleCardPress = useCallback((idx) => {
-    if (!canFlip || cards[idx].flipped || cards[idx].matched) return;
+    if (!canFlip || cards[idx].flipped || cards[idx].matched || complete) return;
 
-    // Start timer on first flip
-    if (!running) setRunning(true);
+    playClick();
 
-    // Phase 1: flip this card face-up
     flipAnim(idx, () => {
       setCards(prev => {
         const next = [...prev];
@@ -180,422 +161,274 @@ export default function MemoryMatchScreen({ onBack }) {
       });
     });
 
-    const newSelected = [...selected, idx];
+    const newSel = [...selected, idx];
+    if (newSel.length < 2) { setSelected(newSel); return; }
 
-    if (newSelected.length < 2) {
-      setSelected(newSelected);
-      return;
-    }
-
-    // Two cards selected — check for match
-    const [a, b] = newSelected;
-    setMoves(m => m + 1);
+    const [a, b] = newSel;
     setCanFlip(false);
     setSelected([]);
 
     setTimeout(() => {
-      if (cards[a].emoji === cards[b].emoji || (a !== b && cards[a].emoji === cards[idx].emoji)) {
-        // Re-read from the latest cards state
+      const isMatch = cards[a].iconName === cards[b].iconName;
+
+      if (isMatch) {
+        playSuccess();
+        setScore(s => s + 50);
+        setMatched(m => m + 1);
         setCards(prev => {
-          const idxA = newSelected[0], idxB = newSelected[1];
-          if (prev[idxA].emoji !== prev[idxB].emoji && prev[idx].emoji !== prev[idxA === idx ? idxB : idxA].emoji) {
-            // No match  (guarded double-check)
-            return prev;
-          }
           const next = [...prev];
-          const mA = newSelected[0], mB = newSelected[1];
-          if (next[mA].emoji === next[mB].emoji) {
-            next[mA] = { ...next[mA], matched: true, flipped: true };
-            next[mB] = { ...next[mB], matched: true, flipped: true };
-            return next;
-          }
-          return prev;
+          next[a] = { ...next[a], matched: true, flipped: true };
+          next[b] = { ...next[b], matched: true, flipped: true };
+          return next;
         });
+        
+        // Check win
+        if (matched + 1 >= cfg.pairs) {
+          setRunning(false);
+          setComplete(true);
+          playSuccess();
+          setBestScore(prev => Math.max(prev, score + 50));
+          
+          const nextLevel = Math.max(maxUnlockedLevel, cfg.level + 1);
+          setMaxUnlockedLevel(nextLevel);
+          globalUnlockedLevel = nextLevel;
+        }
         setCanFlip(true);
       } else {
-        // Flip both back
-        flipBackAnims(newSelected[0], newSelected[1], () => {
+        flipBackBoth(a, b, () => {
           setCards(prev => {
             const next = [...prev];
-            next[newSelected[0]] = { ...next[newSelected[0]], flipped: false };
-            next[newSelected[1]] = { ...next[newSelected[1]], flipped: false };
+            next[a] = { ...next[a], flipped: false };
+            next[b] = { ...next[b], flipped: false };
             return next;
           });
           setCanFlip(true);
         });
       }
-    }, 700);
-  }, [canFlip, cards, selected, running, flipAnim, flipBackAnims]);
+    }, 600);
+  }, [canFlip, cards, selected, complete, matched, cfg, score, timeLeft, flipAnim, flipBackBoth]);
 
-  // ── Check for match properly ──────────────────────────────────────────
-  useEffect(() => {
-    if (selected.length === 2) return;
-    // Count matched pairs
-    const matchedCount = cards.filter(c => c.matched).length / 2;
-    setMatched(matchedCount);
-    if (matchedCount === mode.pairs && mode.pairs > 0) {
-      setComplete(true);
-      setRunning(false);
-      setBestTimes(prev => {
-        const key = mode.key;
-        if (!prev[key] || timer < prev[key]) return { ...prev, [key]: timer };
-        return prev;
-      });
-      winScale.setValue(0); winOp.setValue(0);
-      setTimeout(() => {
-        Animated.parallel([
-          Animated.spring(winScale, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }),
-          Animated.timing(winOp,   { toValue: 1, duration: 300, useNativeDriver: true }),
-        ]).start();
-      }, 300);
-    }
-  }, [cards]);
-
-  // ── New game ──────────────────────────────────────────────────────────
-  const newGame = useCallback((m = mode) => {
-    const deck = buildDeck(m.pairs);
-    setCards(deck);
-    cardAnims.current = deck.map(() => new Animated.Value(1));
-    setSelected([]);
-    setCanFlip(true);
-    setMoves(0);
-    setMatched(0);
-    setTimer(0);
-    setRunning(false);
-    setComplete(false);
-    winScale.setValue(0);
-    winOp.setValue(0);
-  }, [mode]);
-
-  const selectMode = (m) => {
-    setMode(m);
-    setShowModes(false);
-    newGame(m);
-  };
-
-  // Card size based on mode columns
-  const PADDING  = 28;
-  const cardSize = Math.floor((SW - PADDING * 2) / mode.cols) - 6;
-  const rows     = Math.ceil((mode.pairs * 2) / mode.cols);
-  const bestT    = bestTimes[mode.key];
-
-  return (
-    <View style={styles.root}>
-      <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#080818' }]} />
-      <View style={styles.topGlow} />
-      <View style={styles.bottomGlow} />
-
-      <View style={{ height: Platform.OS === 'android' ? (StatusBar.currentHeight || 28) + 6 : 50 }} />
-
-      {/* ── Top bar ── */}
-      <Animated.View style={[styles.topBar, { opacity: hdrO, transform: [{ translateY: hdrY }] }]}>
-        <TouchableOpacity onPress={onBack} activeOpacity={0.7}>
-          <View style={styles.backBtn}>
-            <Text style={styles.backIcon}>‹</Text>
-          </View>
-        </TouchableOpacity>
-
-        <View style={styles.titleBlock}>
-          <Text style={styles.screenTitle}>Memory Match</Text>
-          <Text style={styles.screenSub}>{matched}/{mode.pairs} pairs</Text>
+  // ── Render Start Screen ─────────────────────────────────────────────────
+  if (view === 'start') {
+    return (
+      <View style={startStyles.root}>
+        <StatusBar backgroundColor="transparent" barStyle="dark-content" translucent />
+        
+        {/* Large watermark ? */}
+        <Text style={startStyles.watermark}>?</Text>
+        
+        <View style={startStyles.header}>
+          <TouchableOpacity onPress={onBack} hitSlop={{top:20,bottom:20,left:20,right:20}}>
+            <Text style={{fontSize: 24, color: '#333'}}>←</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Mode selector */}
-        <TouchableOpacity onPress={() => setShowModes(p => !p)} activeOpacity={0.85}>
-          <LinearGradient colors={['#7C4DFF','#AA00FF']} style={styles.modeChip} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-            <Text style={styles.modeChipText}>{mode.emoji} {mode.label}</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </Animated.View>
-
-      {/* Mode dropdown */}
-      {showModes && (
-        <View style={styles.dropdown}>
-          {MODES.map(m => (
-            <TouchableOpacity key={m.key} onPress={() => selectMode(m)} activeOpacity={0.85}>
-              <LinearGradient
-                colors={m.key === 'easy' ? ['#4A148C','#6A1B9A'] : m.key === 'medium' ? ['#7C4DFF','#4A148C'] : ['#AA00FF','#7C4DFF']}
-                style={styles.dropRow}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              >
-                <Text style={styles.dropRowText}>{m.emoji} {m.label}</Text>
-                {bestTimes[m.key] && <Text style={styles.dropBest}>Best: {formatTime(bestTimes[m.key])}</Text>}
-              </LinearGradient>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
-      {/* ── Stats row ── */}
-      <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNum}>{moves}</Text>
-          <Text style={styles.statLabel}>MOVES</Text>
-        </View>
-
-        <View style={[styles.statCard, styles.statCardCenter]}>
-          <Text style={[styles.statNum, styles.timerNum]}>{formatTime(timer)}</Text>
-          <Text style={styles.statLabel}>TIME</Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Text style={styles.statNum}>{matched}</Text>
-          <Text style={styles.statLabel}>PAIRS</Text>
-          {bestT && <Text style={styles.bestLabel}>Best {formatTime(bestT)}</Text>}
+        <View style={startStyles.content}>
+          <Text style={startStyles.title}>Match</Text>
+          <Text style={startStyles.subtitle}>maker</Text>
+          
+          <Text style={startStyles.desc}>Pairs are made in Matchmaker heaven. Start matching!</Text>
+          
+          <TouchableOpacity style={startStyles.playBtn} activeOpacity={0.8} onPress={() => setView('levels')}>
+            <Text style={startStyles.playText}>Play</Text>
+            <View style={startStyles.coin}><Text style={startStyles.coinText}>150</Text></View>
+          </TouchableOpacity>
+          
+          <Text style={startStyles.bestScoreLabel}>Your Best Score:</Text>
+          <Text style={startStyles.bestScoreVal}>{bestScore}</Text>
         </View>
       </View>
+    );
+  }
 
-      {/* Progress bar */}
-      <View style={styles.progressWrap}>
-        <View style={[styles.progressFill, { width: `${(matched / mode.pairs) * 100}%` }]} />
-        <Text style={styles.progressText}>{Math.round((matched / mode.pairs) * 100)}%</Text>
-      </View>
+  // ── Render Levels Screen ────────────────────────────────────────────────
+  if (view === 'levels') {
+    return (
+      <View style={startStyles.root}>
+        <StatusBar backgroundColor="transparent" barStyle="dark-content" translucent />
+        
+        <View style={[startStyles.header, { flexDirection: 'row', alignItems: 'center', marginBottom: 20 }]}>
+          <TouchableOpacity onPress={() => setView('start')} hitSlop={{top:20,bottom:20,left:20,right:20}}>
+            <Text style={{fontSize: 24, color: '#333', marginRight: 20}}>←</Text>
+          </TouchableOpacity>
+          <Text style={{ fontSize: 24, fontWeight: '800', color: '#111' }}>Levels</Text>
+        </View>
 
-      {/* ── Card grid ── */}
-      <ScrollView
-        contentContainerStyle={[styles.grid, { paddingHorizontal: PADDING, paddingBottom: 16 }]}
-        showsVerticalScrollIndicator={false}
-        scrollEnabled={rows > 5}
-      >
-        {Array.from({ length: rows }).map((_, r) => (
-          <View key={r} style={styles.gridRow}>
-            {Array.from({ length: mode.cols }).map((_, c) => {
-              const idx = r * mode.cols + c;
-              if (idx >= cards.length) return <View key={c} style={{ width: cardSize + 8, height: cardSize + 8 }} />;
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
+            {LEVELS.map((l, i) => {
+              const unlocked = l.level <= maxUnlockedLevel;
               return (
-                <MemoryCard
-                  key={cards[idx].id}
-                  card={cards[idx]}
-                  size={cardSize}
-                  onPress={() => handleCardPress(idx)}
-                  scaleAnim={cardAnims.current[idx] || new Animated.Value(1)}
-                  disabled={!canFlip}
-                />
+                <TouchableOpacity
+                  key={i}
+                  style={[startStyles.levelBtn, !unlocked && startStyles.levelBtnLocked]}
+                  onPress={() => unlocked && startLevel(l.level)}
+                  activeOpacity={unlocked ? 0.8 : 1}
+                >
+                  <Text style={[startStyles.levelBtnText, !unlocked && startStyles.levelBtnTextLocked]}>
+                    {unlocked ? l.level : '🔒'}
+                  </Text>
+                </TouchableOpacity>
               );
             })}
           </View>
-        ))}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ── Render Game Screen ──────────────────────────────────────────────────
+  const cols = cfg.cols;
+  const padding = 20;
+  // Calculate size to comfortably fit `cols` number of cards, accounting for MemoryCard's internal padding
+  const cardSize = Math.floor(((SW - (padding * 2)) / cols) / 1.12);
+
+  return (
+    <View style={gameStyles.root}>
+      <StatusBar backgroundColor="transparent" barStyle="dark-content" translucent />
+      <View style={{ paddingHorizontal: 20, paddingTop: 50, paddingBottom: 10 }}>
+        <TouchableOpacity onPress={() => setView('start')} hitSlop={{top:20,bottom:20,left:20,right:20}}>
+          <Text style={{fontSize: 28, color: '#333'}}>←</Text>
+        </TouchableOpacity>
+      </View>
+      
+      <View style={gameStyles.statsBar}>
+        <View style={gameStyles.statItem}><Text style={gameStyles.statLabel}>Level</Text><Text style={gameStyles.statValue}>{cfg.level}</Text></View>
+        <View style={gameStyles.statDivider} />
+        <View style={gameStyles.statItem}><Text style={gameStyles.statLabel}>Matched</Text><Text style={gameStyles.statValue}>{matched}</Text></View>
+        <View style={gameStyles.statDivider} />
+        <View style={gameStyles.statItem}><Text style={gameStyles.statLabel}>Pairs</Text><Text style={gameStyles.statValue}>{cfg.pairs}</Text></View>
+      </View>
+
+      <ScrollView contentContainerStyle={{ padding, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
+        <View style={gameStyles.grid}>
+          {cards.map((card, idx) => (
+            <MemoryCard
+              key={idx}
+              card={card}
+              size={cardSize}
+              onPress={() => handleCardPress(idx)}
+              scaleAnim={cardAnims.current[idx]}
+            />
+          ))}
+        </View>
+        <View style={{height: 100}} />
       </ScrollView>
 
-      {/* ── Win overlay ── */}
+
+
+      {/* Simple Complete Overlay */}
       {complete && (
-        <Animated.View style={[styles.winOverlay, { opacity: winOp }]}>
-          <Animated.View style={[styles.winCard, { transform: [{ scale: winScale }] }]}>
-            <LinearGradient colors={['#2A1060','#1A0A40','#0D0730']} style={styles.winGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-
-              {/* Confetti-like dots */}
-              {['#FF6B6B','#FFD700','#4C9EFF','#69F0AE','#AB47BC'].map((c, i) => (
-                <View key={i} style={[styles.confettiDot, { backgroundColor: c, top: 10 + i * 14, left: 10 + (i % 3) * 40, transform: [{ rotate: `${i * 37}deg` }] }]} />
-              ))}
-
-              <Text style={styles.winEmoji}>🎉</Text>
-              <Text style={styles.winTitle}>You Did It!</Text>
-              <Text style={styles.winSub}>{mode.label} cleared</Text>
-
-              <View style={styles.winStats}>
-                <View style={styles.winStat}>
-                  <Text style={styles.winStatNum}>{moves}</Text>
-                  <Text style={styles.winStatLabel}>moves</Text>
-                </View>
-                <View style={styles.winStatDiv} />
-                <View style={styles.winStat}>
-                  <Text style={[styles.winStatNum, { color: '#FFD700' }]}>{formatTime(timer)}</Text>
-                  <Text style={styles.winStatLabel}>time</Text>
-                </View>
-                {bestT === timer && (
-                  <>
-                    <View style={styles.winStatDiv} />
-                    <View style={styles.winStat}>
-                      <Text style={[styles.winStatNum, { color: '#69F0AE' }]}>🏆</Text>
-                      <Text style={styles.winStatLabel}>new best!</Text>
-                    </View>
-                  </>
-                )}
-              </View>
-
-              <TouchableOpacity onPress={() => newGame(mode)} activeOpacity={0.85}>
-                <LinearGradient colors={['#AA00FF','#7C4DFF','#4C9EFF']} style={styles.winBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                  <Text style={styles.winBtnText}>▶  PLAY AGAIN</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-
-              <TouchableOpacity onPress={() => { newGame(MODES[Math.min(MODES.findIndex(m => m.key === mode.key) + 1, MODES.length - 1)]); selectMode(MODES[Math.min(MODES.findIndex(m => m.key === mode.key) + 1, MODES.length - 1)]); }} activeOpacity={0.8} style={styles.nextModeBtn}>
-                <Text style={styles.nextModeText}>
-                  {MODES.findIndex(m => m.key === mode.key) < MODES.length - 1 ? '→ Try harder mode' : '✓ You beat them all!'}
-                </Text>
-              </TouchableOpacity>
-
-            </LinearGradient>
-          </Animated.View>
-        </Animated.View>
-      )}
-
-      {/* New game button */}
-      {!complete && (
-        <TouchableOpacity onPress={() => newGame(mode)} activeOpacity={0.8} style={styles.newGameRow}>
-          <View style={styles.newGameBtn}>
-            <Text style={styles.newGameText}>↺  New Game</Text>
+        <View style={[StyleSheet.absoluteFill, gameStyles.overlay]}>
+          <View style={gameStyles.popup}>
+            <Text style={gameStyles.popupTitle}>Level Complete!</Text>
+            <TouchableOpacity 
+              style={gameStyles.nextBtn} 
+              onPress={() => startLevel(cfg.level + 1)}
+            >
+              <Text style={gameStyles.nextBtnText}>Next Level</Text>
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, alignItems: 'center' },
-
-  topGlow: {
-    position: 'absolute', top: -80, left: -60,
-    width: 260, height: 260, borderRadius: 130,
-    backgroundColor: '#4A148C', opacity: 0.35,
+// ── Styles ────────────────────────────────────────────────────────────────
+const startStyles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#FBE4C4' },
+  watermark: {
+    position: 'absolute', bottom: -50, right: -50,
+    fontSize: 400, fontWeight: '900',
+    color: '#000000', opacity: 0.04,
+    transform: [{ rotate: '15deg' }]
   },
-  bottomGlow: {
-    position: 'absolute', bottom: -60, right: -40,
-    width: 200, height: 200, borderRadius: 100,
-    backgroundColor: '#7C4DFF', opacity: 0.2,
-  },
-
-  // Top bar
-  topBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    width: '100%', paddingHorizontal: 16, marginBottom: 12,
-  },
-  backBtn: {
-    width: 38, height: 38, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  backIcon: { color: '#FFFFFF', fontSize: 26, lineHeight: 30 },
-  titleBlock: { alignItems: 'center' },
-  screenTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '800', letterSpacing: 0.5 },
-  screenSub:   { color: 'rgba(255,255,255,0.35)', fontSize: 11 },
-  modeChip: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
-  modeChipText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
-
-  // Dropdown
-  dropdown: {
-    position: 'absolute',
-    top: Platform.OS === 'android' ? (StatusBar.currentHeight || 28) + 60 : 110,
-    right: 16, zIndex: 999, borderRadius: 14, overflow: 'hidden',
-    elevation: 24, gap: 2,
-  },
-  dropRow: { paddingHorizontal: 18, paddingVertical: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  dropRowText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-  dropBest:    { color: 'rgba(255,255,255,0.6)', fontSize: 11 },
-
-  // Stats
-  statsRow: {
-    flexDirection: 'row', width: '100%', paddingHorizontal: 16, gap: 8, marginBottom: 10,
-  },
-  statCard: {
-    flex: 1, backgroundColor: '#11112A',
-    borderRadius: 14, paddingVertical: 10,
-    alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
-  },
-  statCardCenter: { borderColor: 'rgba(124,77,255,0.4)' },
-  statNum: { color: '#FFFFFF', fontSize: 24, fontWeight: '800' },
-  timerNum: { color: '#AA00FF', textShadowColor: '#AA00FF', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 },
-  statLabel: { color: 'rgba(255,255,255,0.35)', fontSize: 9, fontWeight: '700', letterSpacing: 2 },
-  bestLabel: { color: '#AA00FF', fontSize: 9, marginTop: 2 },
-
-  // Progress
-  progressWrap: {
-    width: SW - 32, height: 6, backgroundColor: '#11112A',
-    borderRadius: 3, marginBottom: 12, overflow: 'hidden',
+  header: { paddingTop: 50, paddingHorizontal: 20 },
+  content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
+  title: { fontSize: 52, fontWeight: '900', color: '#111', textShadowColor: 'rgba(0,0,0,0.1)', textShadowOffset: {width: 2, height: 2}, textShadowRadius: 0, marginBottom: -10 },
+  subtitle: { fontSize: 44, fontWeight: '900', color: '#111', textShadowColor: 'rgba(0,0,0,0.1)', textShadowOffset: {width: 2, height: 2}, textShadowRadius: 0, marginBottom: 30 },
+  desc: { fontSize: 16, color: '#333', textAlign: 'center', fontWeight: '500', marginBottom: 40, lineHeight: 24 },
+  playBtn: {
     flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#FFB800', // darker yellow/orange
+    paddingVertical: 14, paddingHorizontal: 30,
+    borderRadius: 30,
+    borderWidth: 2, borderColor: '#B38100',
+    marginBottom: 40,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 0, elevation: 2
   },
-  progressFill: {
-    height: '100%', borderRadius: 3,
-    backgroundColor: '#7C4DFF',
+  playText: { fontSize: 22, fontWeight: '800', color: '#111', marginRight: 10 },
+  coin: { backgroundColor: '#FFD52E', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#B38100' },
+  coinText: { fontSize: 16, fontWeight: '700', color: '#111' },
+  bestScoreLabel: { fontSize: 14, color: '#333', fontWeight: '600', marginBottom: 4 },
+  bestScoreVal: { fontSize: 24, fontWeight: '800', color: '#EE2244' },
+  levelBtn: {
+    width: 60, height: 60,
+    backgroundColor: '#FFB800', // Yellow/orange
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: '#B38100',
+    justifyContent: 'center', alignItems: 'center',
+    margin: 8,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 0, elevation: 2
   },
-  progressText: { position: 'absolute', right: 6, color: 'rgba(255,255,255,0.4)', fontSize: 9 },
+  levelBtnText: { 
+    fontSize: 22, fontWeight: '800', color: '#111',
+  },
+  levelBtnLocked: {
+    backgroundColor: '#E0E0E0',
+    borderColor: 'rgba(255,255,255,0.8)',
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+    borderRightColor: 'rgba(0,0,0,0.1)',
+  },
+  levelBtnTextLocked: {
+    fontSize: 22,
+    textShadowColor: 'transparent',
+    opacity: 0.5
+  }
+});
 
-  // Grid
-  grid: { alignItems: 'center' },
-  gridRow: { flexDirection: 'row' },
+const gameStyles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#FBE4C4' },
+  statsBar: { flexDirection: 'row', backgroundColor: '#FFF', marginHorizontal: 20, marginBottom: 20, borderRadius: 20, padding: 15, justifyContent: 'space-around', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  statItem: { alignItems: 'center' },
+  statLabel: { fontSize: 12, color: '#777', marginBottom: 4 },
+  statValue: { fontSize: 18, fontWeight: '800', color: '#333' },
+  statDivider: { width: 1, height: 20, backgroundColor: '#EEE' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
 
-  // Cards
-  cardFront: {
-    backgroundColor: '#1E1040',
-    borderWidth: 1.5, borderColor: 'rgba(124,77,255,0.3)',
+  
+  overlay: { backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  popup: { backgroundColor: '#FFF', padding: 30, borderRadius: 20, alignItems: 'center', width: SW * 0.8 },
+  popupTitle: { fontSize: 24, fontWeight: '800', color: '#111', marginBottom: 20 },
+  nextBtn: { backgroundColor: '#FFD52E', paddingVertical: 14, paddingHorizontal: 30, borderRadius: 30 },
+  nextBtnText: { fontSize: 18, fontWeight: '800', color: '#111' }
+});
+
+const cardStyles = StyleSheet.create({
+  front: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1, borderColor: '#E0E0E0',
     alignItems: 'center', justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#7C4DFF', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2
   },
-  cardMatched: {
-    borderColor: 'rgba(105,240,174,0.5)',
-    elevation: 8,
-    shadowColor: '#69F0AE', shadowOpacity: 0.4,
-  },
-  matchTick: {
-    position: 'absolute', top: 3, right: 3,
-    width: 14, height: 14, borderRadius: 7,
-    backgroundColor: '#69F0AE', alignItems: 'center', justifyContent: 'center',
-  },
-  matchTickText: { color: '#000', fontSize: 8, fontWeight: 'bold' },
-
-  cardBack: {
+  back: {
+    backgroundColor: '#FF9E00', // Base orange
     alignItems: 'center', justifyContent: 'center',
-    overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#AA00FF', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.4, shadowRadius: 8,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.15, shadowRadius: 2, elevation: 3
   },
-  cardPattern: {
-    position: 'absolute', flexDirection: 'row', flexWrap: 'wrap', padding: 4,
+  backInner: {
+    borderWidth: 4,
+    borderColor: 'rgba(255,255,255,0.25)', // Top/Left light bevel
+    borderBottomColor: 'rgba(0,0,0,0.15)', // Bottom shadow bevel
+    borderRightColor: 'rgba(0,0,0,0.15)',
+    borderRadius: 12
   },
-  patternDot: {
-    width: 5, height: 5, borderRadius: 2.5,
-    backgroundColor: '#FFFFFF', margin: 3,
-  },
-  cardQ: { color: '#FFFFFF', fontWeight: 'bold' },
-
-  // New game
-  newGameRow: { paddingBottom: 16, paddingTop: 4 },
-  newGameBtn: {
-    borderRadius: 14, paddingHorizontal: 24, paddingVertical: 10,
-    backgroundColor: 'rgba(124,77,255,0.15)',
-    borderWidth: 1, borderColor: 'rgba(124,77,255,0.3)',
-  },
-  newGameText: { color: '#AA00FF', fontSize: 13, fontWeight: '700', letterSpacing: 1 },
-
-  // Win overlay
-  winOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    alignItems: 'center', justifyContent: 'center',
-    zIndex: 999,
-  },
-  winCard: {
-    width: SW * 0.82, borderRadius: 28,
-    overflow: 'hidden',
-    borderWidth: 1.5, borderColor: 'rgba(124,77,255,0.4)',
-    elevation: 24,
-    shadowColor: '#AA00FF', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20,
-  },
-  winGrad: { padding: 28, alignItems: 'center', overflow: 'hidden' },
-
-  confettiDot: { position: 'absolute', width: 8, height: 8, borderRadius: 2 },
-
-  winEmoji: { fontSize: 52, marginBottom: 8 },
-  winTitle: { color: '#FFFFFF', fontSize: 28, fontWeight: '800', marginBottom: 4, letterSpacing: -0.5 },
-  winSub:   { color: 'rgba(255,255,255,0.5)', fontSize: 14, marginBottom: 20 },
-
-  winStats: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, gap: 12 },
-  winStat:  { alignItems: 'center' },
-  winStatNum: { color: '#FFFFFF', fontSize: 26, fontWeight: '800' },
-  winStatLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  winStatDiv:   { width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.1)' },
-
-  winBtn: {
-    borderRadius: 24, paddingHorizontal: 36, paddingVertical: 13,
-    elevation: 8, shadowColor: '#AA00FF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 10,
-    marginBottom: 12,
-  },
-  winBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800', letterSpacing: 1.5 },
-
-  nextModeBtn: { paddingVertical: 6 },
-  nextModeText: { color: 'rgba(255,255,255,0.4)', fontSize: 13 },
+  qMark: {
+    fontWeight: '900', color: '#222', // Almost black
+    textShadowColor: 'rgba(255,255,255,0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 0
+  }
 });

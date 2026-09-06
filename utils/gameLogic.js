@@ -12,58 +12,73 @@ export const COLORS = {
 };
 
 export const BLOCK_SHAPES = [
-  // 1x1
-  { shape: [[1]], color: 'yellow', name: 'dot' },
+  // 1x1 Dot
+  { shape: [[1]], color: 'red', name: 'dot' },
+  
+  // 2x2 Square
+  { shape: [
+      [1, 1],
+      [1, 1]
+    ], color: 'yellow', name: 'sq_2x2' },
 
-  // 1x2 horizontal
-  { shape: [[1, 1]], color: 'cyan', name: 'h2' },
-  // 2x1 vertical
-  { shape: [[1], [1]], color: 'cyan', name: 'v2' },
+  // 3x3 Square
+  { shape: [
+      [1, 1, 1],
+      [1, 1, 1],
+      [1, 1, 1]
+    ], color: 'orange', name: 'sq_3x3' },
+  
+  // Lines (Horizontal)
+  { shape: [[1, 1]], color: 'blue', name: 'h2' },
+  { shape: [[1, 1, 1]], color: 'cyan', name: 'h3' },
+  { shape: [[1, 1, 1, 1]], color: 'purple', name: 'h4' },
+  { shape: [[1, 1, 1, 1, 1]], color: 'pink', name: 'h5' },
+  
+  // Lines (Vertical)
+  { shape: [[1], [1]], color: 'blue', name: 'v2' },
+  { shape: [[1], [1], [1]], color: 'cyan', name: 'v3' },
+  { shape: [[1], [1], [1], [1]], color: 'purple', name: 'v4' },
+  { shape: [[1], [1], [1], [1], [1]], color: 'pink', name: 'v5' },
+  
+  // L-Shapes Small
+  { shape: [[1, 0], [1, 1]], color: 'orange', name: 'l_sm1' },
+  { shape: [[0, 1], [1, 1]], color: 'orange', name: 'l_sm2' },
+  { shape: [[1, 1], [1, 0]], color: 'orange', name: 'l_sm3' },
+  { shape: [[1, 1], [0, 1]], color: 'orange', name: 'l_sm4' },
 
-  // 1x3 horizontal
-  { shape: [[1, 1, 1]], color: 'green', name: 'h3' },
-  // 3x1 vertical
-  { shape: [[1], [1], [1]], color: 'green', name: 'v3' },
+  // L-Shapes Large (3x3)
+  { shape: [
+      [1, 0, 0],
+      [1, 0, 0],
+      [1, 1, 1]
+    ], color: 'green', name: 'l_lg1' },
+  { shape: [
+      [0, 0, 1],
+      [0, 0, 1],
+      [1, 1, 1]
+    ], color: 'green', name: 'l_lg2' },
+  { shape: [
+      [1, 1, 1],
+      [1, 0, 0],
+      [1, 0, 0]
+    ], color: 'green', name: 'l_lg3' },
+  { shape: [
+      [1, 1, 1],
+      [0, 0, 1],
+      [0, 0, 1]
+    ], color: 'green', name: 'l_lg4' },
 
-  // 1x4 horizontal
-  { shape: [[1, 1, 1, 1]], color: 'blue', name: 'h4' },
-  // 4x1 vertical
-  { shape: [[1], [1], [1], [1]], color: 'blue', name: 'v4' },
+  // T-Shapes Small
+  { shape: [[1, 1, 1], [0, 1, 0]], color: 'purple', name: 't_sm1' },
+  { shape: [[0, 1, 0], [1, 1, 1]], color: 'purple', name: 't_sm2' },
+  { shape: [[1, 0], [1, 1], [1, 0]], color: 'purple', name: 't_sm3' },
+  { shape: [[0, 1], [1, 1], [0, 1]], color: 'purple', name: 't_sm4' },
 
-  // 1x5 horizontal
-  { shape: [[1, 1, 1, 1, 1]], color: 'purple', name: 'h5' },
-  // 5x1 vertical
-  { shape: [[1], [1], [1], [1], [1]], color: 'purple', name: 'v5' },
-
-  // 2x2 square
-  { shape: [[1, 1], [1, 1]], color: 'orange', name: '2x2' },
-
-  // 3x3 square
-  { shape: [[1, 1, 1], [1, 1, 1], [1, 1, 1]], color: 'red', name: '3x3' },
-
-  // L shapes
-  { shape: [[1, 0], [1, 0], [1, 1]], color: 'orange', name: 'L' },
-  { shape: [[0, 1], [0, 1], [1, 1]], color: 'orange', name: 'L2' },
-  { shape: [[1, 1], [1, 0], [1, 0]], color: 'pink', name: 'L3' },
-  { shape: [[1, 1], [0, 1], [0, 1]], color: 'pink', name: 'L4' },
-
-  // T shape
-  { shape: [[1, 1, 1], [0, 1, 0]], color: 'purple', name: 'T' },
-  { shape: [[0, 1, 0], [1, 1, 1]], color: 'purple', name: 'T2' },
-  { shape: [[1, 0], [1, 1], [1, 0]], color: 'cyan', name: 'T3' },
-  { shape: [[0, 1], [1, 1], [0, 1]], color: 'cyan', name: 'T4' },
-
-  // S/Z shapes
-  { shape: [[0, 1, 1], [1, 1, 0]], color: 'green', name: 'S' },
-  { shape: [[1, 1, 0], [0, 1, 1]], color: 'red', name: 'Z' },
-  { shape: [[1, 0], [1, 1], [0, 1]], color: 'green', name: 'S2' },
-  { shape: [[0, 1], [1, 1], [1, 0]], color: 'red', name: 'Z2' },
-
-  // Corner
-  { shape: [[1, 1], [1, 0]], color: 'yellow', name: 'corner1' },
-  { shape: [[1, 1], [0, 1]], color: 'yellow', name: 'corner2' },
-  { shape: [[1, 0], [1, 1]], color: 'orange', name: 'corner3' },
-  { shape: [[0, 1], [1, 1]], color: 'orange', name: 'corner4' },
+  // Z-Shapes
+  { shape: [[1, 1, 0], [0, 1, 1]], color: 'red', name: 'z1' },
+  { shape: [[0, 1, 1], [1, 1, 0]], color: 'red', name: 'z2' },
+  { shape: [[1, 0], [1, 1], [0, 1]], color: 'red', name: 'z3' },
+  { shape: [[0, 1], [1, 1], [1, 0]], color: 'red', name: 'z4' },
 ];
 
 export function createEmptyBoard() {

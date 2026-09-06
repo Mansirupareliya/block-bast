@@ -9,6 +9,8 @@ import DraggablePiece from '../components/DraggablePiece';
 import PieceView from '../components/PieceView';
 import ScoreAnimation from '../components/ScoreAnimation';
 import GameOverScreen from './GameOverScreen';
+import GameHeader, { STATUS_H } from '../components/GameHeader';
+import { playClick, playSuccess, playFail } from '../utils/audioManager';
 import {
   BOARD_SIZE, createEmptyBoard, getRandomPieces,
   canPlacePiece, placePiece, clearLines,
@@ -17,8 +19,150 @@ import {
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const CELL_SIZE    = Math.floor((SW - 32) / BOARD_SIZE);
-const BOARD_OFFSET = 4;
-const LIFT_Y       = 115;
+const BOARD_OFFSET = 4;   // board padding(2) + borderWidth(2)
+const PIECE_GAP    = 18;  // px gap between dragged-piece bottom and finger
+
+// ── View-drawn trophy icon ────────────────────────────────────────────────
+function TrophyIcon({ size = 22 }) {
+  const s = size;
+  return (
+    <View style={{ width: s, height: s, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Cup bowl */}
+      <View style={{
+        width: s * 0.64, height: s * 0.44,
+        borderTopLeftRadius: s * 0.32, borderTopRightRadius: s * 0.32,
+        borderBottomLeftRadius: s * 0.08, borderBottomRightRadius: s * 0.08,
+        backgroundColor: '#FFD700',
+        position: 'absolute', top: 0,
+        borderWidth: 1.5, borderColor: '#FFB800',
+      }} />
+      {/* Handles left */}
+      <View style={{
+        position: 'absolute', left: 0, top: s * 0.06,
+        width: s * 0.18, height: s * 0.28,
+        borderTopLeftRadius: s * 0.14, borderBottomLeftRadius: s * 0.14,
+        borderWidth: 2, borderColor: '#FFD700', borderRightWidth: 0,
+      }} />
+      {/* Handles right */}
+      <View style={{
+        position: 'absolute', right: 0, top: s * 0.06,
+        width: s * 0.18, height: s * 0.28,
+        borderTopRightRadius: s * 0.14, borderBottomRightRadius: s * 0.14,
+        borderWidth: 2, borderColor: '#FFD700', borderLeftWidth: 0,
+      }} />
+      {/* Stem */}
+      <View style={{
+        position: 'absolute', bottom: s * 0.12, left: s * 0.38,
+        width: s * 0.24, height: s * 0.22,
+        backgroundColor: '#FFD700',
+      }} />
+      {/* Base */}
+      <View style={{
+        position: 'absolute', bottom: 0, left: s * 0.18,
+        width: s * 0.64, height: s * 0.14,
+        borderRadius: s * 0.04,
+        backgroundColor: '#FFD700',
+      }} />
+    </View>
+  );
+}
+
+// ── View-drawn crown icon ─────────────────────────────────────────────────
+function CrownIcon({ size = 20 }) {
+  const s = size;
+  return (
+    <View style={{ width: s, height: s * 0.7, justifyContent: 'flex-end' }}>
+      {/* Base band */}
+      <View style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        height: s * 0.3,
+        backgroundColor: '#FFD700',
+        borderRadius: s * 0.04,
+        borderWidth: 1, borderColor: '#FFB800',
+      }} />
+      {/* Left spike */}
+      <View style={{
+        position: 'absolute', bottom: s * 0.28, left: s * 0.04,
+        width: 0, height: 0,
+        borderLeftWidth: s * 0.12, borderRightWidth: s * 0.12,
+        borderBottomWidth: s * 0.38,
+        borderLeftColor: 'transparent', borderRightColor: 'transparent',
+        borderBottomColor: '#FFD700',
+      }} />
+      {/* Center spike (taller) */}
+      <View style={{
+        position: 'absolute', bottom: s * 0.28, left: s * 0.38,
+        width: 0, height: 0,
+        borderLeftWidth: s * 0.12, borderRightWidth: s * 0.12,
+        borderBottomWidth: s * 0.48,
+        borderLeftColor: 'transparent', borderRightColor: 'transparent',
+        borderBottomColor: '#FFD700',
+      }} />
+      {/* Right spike */}
+      <View style={{
+        position: 'absolute', bottom: s * 0.28, right: s * 0.04,
+        width: 0, height: 0,
+        borderLeftWidth: s * 0.12, borderRightWidth: s * 0.12,
+        borderBottomWidth: s * 0.38,
+        borderLeftColor: 'transparent', borderRightColor: 'transparent',
+        borderBottomColor: '#FFD700',
+      }} />
+      {/* Crown gems */}
+      <View style={{
+        position: 'absolute', bottom: s * 0.06, left: s * 0.12,
+        width: s * 0.1, height: s * 0.1, borderRadius: s * 0.05,
+        backgroundColor: '#FF4466',
+      }} />
+      <View style={{
+        position: 'absolute', bottom: s * 0.06, left: s * 0.45,
+        width: s * 0.1, height: s * 0.1, borderRadius: s * 0.05,
+        backgroundColor: '#4488FF',
+      }} />
+      <View style={{
+        position: 'absolute', bottom: s * 0.06, right: s * 0.12,
+        width: s * 0.1, height: s * 0.1, borderRadius: s * 0.05,
+        backgroundColor: '#44FF88',
+      }} />
+    </View>
+  );
+}
+
+// ── View-drawn star icon ──────────────────────────────────────────────────
+function StarIcon({ size = 24, filled = false }) {
+  const s = size;
+  // Simple 5-point star via a circle with an overlay — approximation
+  return (
+    <View style={{ width: s, height: s, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Star body using rotated squares */}
+      <View style={{
+        width: s * 0.55, height: s * 0.55,
+        backgroundColor: filled ? '#FFD700' : 'transparent',
+        borderWidth: filled ? 0 : 2,
+        borderColor: '#FFD700',
+        transform: [{ rotate: '45deg' }],
+        borderRadius: s * 0.06,
+      }} />
+      <View style={{
+        position: 'absolute',
+        width: s * 0.55, height: s * 0.55,
+        backgroundColor: filled ? '#FFD700' : 'transparent',
+        borderWidth: filled ? 0 : 2,
+        borderColor: '#FFD700',
+        borderRadius: s * 0.06,
+      }} />
+    </View>
+  );
+}
+
+// ── Pause button icon ─────────────────────────────────────────────────────
+function PauseIcon({ size = 16 }) {
+  return (
+    <View style={{ width: size, height: size, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: size * 0.22 }}>
+      <View style={{ width: size * 0.25, height: size * 0.7, backgroundColor: '#FFFFFF', borderRadius: 2 }} />
+      <View style={{ width: size * 0.25, height: size * 0.7, backgroundColor: '#FFFFFF', borderRadius: 2 }} />
+    </View>
+  );
+}
 
 export default function GameScreen({ onBack }) {
   const [board,        setBoard]        = useState(createEmptyBoard);
@@ -29,9 +173,10 @@ export default function GameScreen({ onBack }) {
   const [ghostCells,   setGhostCells]   = useState([]);
   const [clearedCells, setClearedCells] = useState([]);
   const [scoreAnims,   setScoreAnims]   = useState([]);
-  const [comboInfo,    setComboInfo]    = useState(null); // { text, count }
+  const [comboInfo,    setComboInfo]    = useState(null);
   const [isGameOver,   setIsGameOver]   = useState(false);
   const [dragging,     setDragging]     = useState(null);
+  const [liked,        setLiked]        = useState(false);
 
   const scoreScale = useRef(new Animated.Value(1)).current;
   const comboScale = useRef(new Animated.Value(0)).current;
@@ -46,23 +191,31 @@ export default function GameScreen({ onBack }) {
   const piecesState    = useRef(pieces);
   const comboRef       = useRef(combo);
   const scoreRef       = useRef(score);
+  const dragPan        = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const lastGhost      = useRef({ row: -1, col: -1 });
 
-  boardState.current = board;
+  boardState.current  = board;
   piecesState.current = pieces;
-  comboRef.current   = combo;
-  scoreRef.current   = score;
+  comboRef.current    = combo;
+  scoreRef.current    = score;
 
   const measureBoard = useCallback(() => {
     requestAnimationFrame(() => {
-      boardRef.current?.measure((_x, _y, _w, _h, px, py) => { boardPagePos.current = { x: px, y: py }; });
-      containerRef.current?.measure((_x, _y, _w, _h, _px, py) => { containerPageY.current = py; });
+      boardRef.current?.measure((_x, _y, _w, _h, px, py) => {
+        boardPagePos.current = { x: px, y: py };
+      });
+      containerRef.current?.measure((_x, _y, _w, _h, _px, py) => {
+        containerPageY.current = py;
+      });
     });
   }, []);
 
   const getBoardCell = useCallback((pageX, pageY, shape) => {
     const { x: bx, y: by } = boardPagePos.current;
-    const col = Math.round((pageX - (shape[0].length * CELL_SIZE) / 2 - bx - BOARD_OFFSET) / CELL_SIZE);
-    const row = Math.round((pageY - LIFT_Y - (shape.length * CELL_SIZE) / 2 - by - BOARD_OFFSET) / CELL_SIZE);
+    const pieceW = shape[0].length * CELL_SIZE;
+    const pieceH = shape.length    * CELL_SIZE;
+    const col = Math.round((pageX - pieceW / 2 - bx - BOARD_OFFSET) / CELL_SIZE);
+    const row = Math.round((pageY - pieceH - PIECE_GAP - by - BOARD_OFFSET) / CELL_SIZE);
     return { row, col };
   }, []);
 
@@ -79,16 +232,25 @@ export default function GameScreen({ onBack }) {
   const handleDragStart = useCallback((idx, px, py) => {
     const piece = piecesState.current[idx];
     if (!piece) return;
-    setDragging({ pieceIdx: idx, piece, pageX: px, pageY: py });
+    dragPan.setValue({ x: px, y: py });
+    setDragging({ pieceIdx: idx, piece });
+    
+    lastGhost.current = { row: -1, col: -1 };
     setGhostCells(calcGhost(px, py, piece, boardState.current));
-  }, [calcGhost]);
+  }, [calcGhost, dragPan]);
 
   const handleDragMove = useCallback((idx, px, py) => {
     const piece = piecesState.current[idx];
     if (!piece) return;
-    setDragging(prev => prev ? { ...prev, pageX: px, pageY: py } : null);
-    setGhostCells(calcGhost(px, py, piece, boardState.current));
-  }, [calcGhost]);
+    dragPan.setValue({ x: px, y: py });
+    
+    // Only update ghost cells if the grid position changed
+    const { row, col } = getBoardCell(px, py, piece.shape);
+    if (lastGhost.current.row !== row || lastGhost.current.col !== col) {
+      lastGhost.current = { row, col };
+      setGhostCells(calcGhost(px, py, piece, boardState.current));
+    }
+  }, [calcGhost, getBoardCell, dragPan]);
 
   const handleDragEnd = useCallback((idx, px, py) => {
     setGhostCells([]);
@@ -101,11 +263,12 @@ export default function GameScreen({ onBack }) {
     if (!canPlacePiece(cur, dragPiece.shape, row, col)) return;
 
     const placed = placePiece(cur, dragPiece.shape, row, col, dragPiece.color);
+    playClick();
     const { newBoard, clearedRows, clearedCols, linesCleared } = clearLines(placed);
 
-    const newCombo = linesCleared > 0 ? comboRef.current + 1 : 0;
-    const gained   = calculateScore(countPieceCells(dragPiece.shape), linesCleared, newCombo);
-    const newScore = scoreRef.current + gained;
+    const newCombo  = linesCleared > 0 ? comboRef.current + 1 : 0;
+    const gained    = calculateScore(countPieceCells(dragPiece.shape), linesCleared, newCombo);
+    const newScore  = scoreRef.current + gained;
 
     setScore(newScore);
     setBestScore(prev => Math.max(prev, newScore));
@@ -115,31 +278,33 @@ export default function GameScreen({ onBack }) {
 
     // Score pulse
     Animated.sequence([
-      Animated.spring(scoreScale, { toValue: 1.4, friction: 3, useNativeDriver: true }),
-      Animated.spring(scoreScale, { toValue: 1,   friction: 5, useNativeDriver: true }),
+      Animated.spring(scoreScale, { toValue: 1.35, friction: 3, useNativeDriver: true }),
+      Animated.spring(scoreScale, { toValue: 1,    friction: 5, useNativeDriver: true }),
     ]).start();
 
-    // Floating score
+    // Floating score badge
     const ax = boardPagePos.current.x + (CELL_SIZE * BOARD_SIZE) / 2;
     const ay = boardPagePos.current.y - containerPageY.current + (CELL_SIZE * BOARD_SIZE) / 3;
     setScoreAnims(prev => [...prev, { id: Date.now(), score: gained, x: ax, y: ay }]);
 
-    // Combo
+    // Combo banner
     if (newCombo >= 2) {
       const labels = ['NICE!','GREAT!','AWESOME!','AMAZING!','INCREDIBLE!'];
       setComboInfo({ text: labels[Math.min(newCombo - 2, 4)], count: newCombo });
       comboScale.setValue(0); comboOp.setValue(0);
       Animated.parallel([
         Animated.spring(comboScale, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }),
-        Animated.timing(comboOp,  { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(comboOp,  { toValue: 1, duration: 180, useNativeDriver: true }),
       ]).start();
       setTimeout(() => {
-        Animated.timing(comboOp, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => setComboInfo(null));
+        Animated.timing(comboOp, { toValue: 0, duration: 300, useNativeDriver: true })
+          .start(() => setComboInfo(null));
       }, 1100);
     }
 
-    // Line clear flash
+    // Line-clear flash
     if (linesCleared > 0) {
+      playSuccess();
       const flash = [];
       clearedRows.forEach(r => { for (let c = 0; c < BOARD_SIZE; c++) flash.push({ r, c }); });
       clearedCols.forEach(cl => { for (let r = 0; r < BOARD_SIZE; r++) flash.push({ r, c: cl }); });
@@ -149,14 +314,16 @@ export default function GameScreen({ onBack }) {
       setTimeout(() => setClearedCells([]), 380);
     }
 
-    const next = [...piecesState.current];
-    next[idx] = null;
+    const next  = [...piecesState.current];
+    next[idx]   = null;
     const final = next.every(p => p === null) ? getRandomPieces(3) : next;
     setPieces(final);
     piecesState.current = final;
 
-    if (checkGameOver(newBoard, final.filter(Boolean)))
+    if (checkGameOver(newBoard, final.filter(Boolean))) {
+      playFail();
       setTimeout(() => setIsGameOver(true), 500);
+    }
   }, [getBoardCell]);
 
   const handleRestart = useCallback(() => {
@@ -169,237 +336,349 @@ export default function GameScreen({ onBack }) {
     setIsGameOver(false); setDragging(null);
   }, []);
 
-  const overlayStyle = dragging ? {
-    position: 'absolute',
-    left: dragging.pageX - (dragging.piece.shape[0].length * CELL_SIZE) / 2,
-    top:  dragging.pageY - containerPageY.current - LIFT_Y - (dragging.piece.shape.length * CELL_SIZE) / 2,
-  } : null;
+  const getOverlayTransform = () => {
+    if (!dragging) return [];
+    const ox = (dragging.piece.shape[0].length * CELL_SIZE) / 2;
+    const oy = containerPageY.current + (dragging.piece.shape.length * CELL_SIZE) + PIECE_GAP;
+    return [
+      { translateX: Animated.subtract(dragPan.x, ox) },
+      { translateY: Animated.subtract(dragPan.y, oy) }
+    ];
+  };
 
-  const boardGlowOp = boardFlash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.9] });
+  const boardGlowOp = boardFlash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.85] });
 
   return (
     <View style={styles.root} ref={containerRef} onLayout={measureBoard} collapsable={false}>
       <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#080818' }]} />
 
-      {/* Subtle top glow */}
-      <View style={styles.topGlow} />
+      {/* ── Bright periwinkle blue background (matches image 1) ── */}
+      <LinearGradient
+        colors={['#6678D8', '#5568C8', '#4D60C0', '#4558B8']}
+        style={StyleSheet.absoluteFill}
+      />
 
-      <View style={{ height: Platform.OS === 'android' ? (StatusBar.currentHeight || 28) + 6 : 50 }} />
+      {/* Subtle top vignette for depth */}
+      <View style={styles.topVignette} />
 
-      {/* ── Top bar ── */}
-      <View style={styles.topBar}>
-        {onBack && (
-          <TouchableOpacity onPress={onBack} style={styles.backBtn} activeOpacity={0.7}>
-            <View style={styles.backBtnInner}>
-              <Text style={styles.backIcon}>‹</Text>
-            </View>
-          </TouchableOpacity>
-        )}
+      {/* ── Header ── */}
+      <GameHeader
+        title="Block Blast"
+        subtitle={`BEST: ${bestScore.toLocaleString()}`}
+        accent="#FFD700"
+        onBack={onBack}
+        liked={liked}
+        onLike={() => setLiked(l => !l)}
+      />
 
-        {/* Best score */}
-        <View style={styles.statBox}>
-          <Text style={styles.statIcon}>👑</Text>
-          <View>
-            <Text style={styles.statLabel}>BEST</Text>
-            <Text style={styles.statValue}>{bestScore.toLocaleString()}</Text>
-          </View>
-        </View>
+      {/* ── Current score large display ── */}
+      <Animated.Text style={[styles.bigScore, { transform: [{ scale: scoreScale }] }]}>
+        {score.toLocaleString()}
+      </Animated.Text>
 
-        {/* Current score – centre */}
-        <View style={styles.scoreMain}>
-          <Text style={styles.scoreMainLabel}>SCORE</Text>
-          <Animated.Text style={[styles.scoreMainValue, { transform: [{ scale: scoreScale }] }]}>
-            {score.toLocaleString()}
-          </Animated.Text>
-        </View>
-
-        {/* Combo counter */}
-        <View style={styles.statBox}>
-          <Text style={styles.statIcon}>🔥</Text>
-          <View>
-            <Text style={styles.statLabel}>COMBO</Text>
-            <Text style={styles.statValue}>×{combo}</Text>
-          </View>
-        </View>
-      </View>
 
       {/* ── Combo banner ── */}
       <View style={styles.comboBannerWrap}>
         {comboInfo && (
           <Animated.View style={{ transform: [{ scale: comboScale }], opacity: comboOp }}>
-            <LinearGradient colors={['#FF4444','#FF8C00','#FFD700']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.comboPill}>
-              <Text style={styles.comboEmoji}>⚡</Text>
-              <Text style={styles.comboLabel}>{comboInfo.text}</Text>
-              <View style={styles.comboBadge}>
-                <Text style={styles.comboBadgeText}>×{comboInfo.count}</Text>
-              </View>
-            </LinearGradient>
+            <View style={styles.comboPill}>
+              <Text style={styles.comboLabel}>Combo</Text>
+              <Text style={styles.comboCount}>{comboInfo.count}</Text>
+            </View>
           </Animated.View>
         )}
       </View>
 
       {/* ── Board ── */}
       <View style={styles.boardOuter}>
-        {/* Board background with grid feel */}
-        <View style={styles.boardBg}>
+        <View style={styles.boardShadow}>
           <View ref={boardRef} collapsable={false} onLayout={measureBoard}>
-            <Board board={board} ghostCells={ghostCells} highlightCells={clearedCells} cellSize={CELL_SIZE} />
+            <Board
+              board={board}
+              ghostCells={ghostCells}
+              highlightCells={clearedCells}
+              cellSize={CELL_SIZE}
+            />
           </View>
         </View>
-        {/* Flash overlay on line clear */}
-        <Animated.View style={[styles.flashOverlay, { opacity: boardGlowOp }]} pointerEvents="none" />
+        <Animated.View
+          style={[styles.flashOverlay, { opacity: boardGlowOp }]}
+          pointerEvents="none"
+        />
       </View>
 
-      {/* Score animations */}
+      {/* ── Score badges ── */}
       {scoreAnims.map(a => (
-        <ScoreAnimation key={a.id} score={a.score} x={a.x} y={a.y}
-          onDone={() => setScoreAnims(prev => prev.filter(p => p.id !== a.id))} />
+        <ScoreAnimation
+          key={a.id} score={a.score} x={a.x} y={a.y}
+          onDone={() => setScoreAnims(prev => prev.filter(p => p.id !== a.id))}
+        />
       ))}
 
       {/* ── Piece tray ── */}
       <View style={styles.tray}>
-        <View style={styles.trayInner}>
-          <View style={styles.trayHandle} />
+        <View style={styles.trayCard}>
+          {/* Glass shine top line */}
+          <View style={styles.trayShine} />
           <View style={styles.piecesRow}>
             {pieces.map((piece, idx) => (
               <View key={idx} style={styles.pieceSlot}>
-                <View style={[styles.slotBg, !piece && styles.slotEmpty]}>
-                  {piece && (
-                    <DraggablePiece
-                      piece={piece} index={idx}
-                      onDragStart={handleDragStart}
-                      onDragMove={handleDragMove}
-                      onDragEnd={handleDragEnd}
-                      disabled={isGameOver}
-                      isDragging={dragging?.pieceIdx === idx}
-                    />
-                  )}
-                </View>
+                {piece ? (
+                  <DraggablePiece
+                    piece={piece}
+                    index={idx}
+                    onDragStart={handleDragStart}
+                    onDragMove={handleDragMove}
+                    onDragEnd={handleDragEnd}
+                    disabled={isGameOver}
+                    isDragging={dragging?.pieceIdx === idx}
+                  />
+                ) : (
+                  <View style={styles.emptySlot} />
+                )}
               </View>
             ))}
           </View>
         </View>
       </View>
 
-      {/* Drag overlay */}
+      {/* ── Drag overlay ── */}
       {dragging && (
         <View style={styles.dragOverlay} pointerEvents="none">
-          <View style={overlayStyle}>
-            <View style={[styles.dragShadow, {
-              width:  dragging.piece.shape[0].length * CELL_SIZE,
-              height: dragging.piece.shape.length * CELL_SIZE,
-            }]} />
+          <Animated.View style={{
+            position: 'absolute',
+            transform: getOverlayTransform(),
+            // Floating shadow glow
+            elevation: 24,
+            shadowColor: '#44AAFF',
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.7,
+            shadowRadius: 18,
+          }}>
             <PieceView piece={dragging.piece} cellSize={CELL_SIZE} />
-          </View>
+          </Animated.View>
         </View>
       )}
 
+      {/* ── Game over ── */}
       {isGameOver && (
-        <GameOverScreen score={score} bestScore={bestScore} onRestart={handleRestart} />
+        <GameOverScreen
+          score={score}
+          bestScore={bestScore}
+          onRestart={handleRestart}
+          onBack={onBack}
+        />
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root:    { flex: 1, alignItems: 'center' },
-  topGlow: {
-    position: 'absolute', top: -80, left: SW / 2 - 140,
-    width: 280, height: 280, borderRadius: 140,
-    backgroundColor: '#1A1060', opacity: 0.7,
+  root: { flex: 1, alignItems: 'center' },
+
+  topVignette: {
+    position: 'absolute', top: 0, left: 0, right: 0,
+    height: 220,
+    backgroundColor: 'rgba(0,0,0,0.08)',
   },
 
-  // Top bar
-  topBar: {
-    flexDirection: 'row', alignItems: 'center',
-    width: '100%', paddingHorizontal: 14, marginBottom: 6,
-    justifyContent: 'space-between',
+  // ── HUD Bar ──
+  hudBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 10,
+    marginBottom: 2,
+    height: 56,
   },
-  backBtn: { marginRight: 6 },
-  backBtnInner: {
-    width: 36, height: 36, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+
+  hudLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  backBtn: {
+    width: 32, height: 32, borderRadius: 9,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center', justifyContent: 'center',
   },
-  backIcon: { color: '#FFFFFF', fontSize: 24, lineHeight: 28 },
+  backIcon: { color: '#FFFFFF', fontSize: 22, lineHeight: 28, marginLeft: -1 },
 
-  statBox: { flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 70 },
-  statIcon: { fontSize: 18 },
-  statLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '700', letterSpacing: 1.5 },
-  statValue: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-
-  scoreMain: { alignItems: 'center' },
-  scoreMainLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '700', letterSpacing: 2 },
-  scoreMainValue: {
-    color: '#FFFFFF', fontSize: 36, fontWeight: '800', letterSpacing: -0.5,
-    textShadowColor: '#4C9EFF', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12,
+  trophyBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,215,0,0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.3)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    gap: 5,
+  },
+  trophyIconWrap: { width: 20, height: 20 },
+  bestScorePill: {},
+  bestScoreValue: {
+    color: '#FFD700',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 
-  // Combo
-  comboBannerWrap: { height: 42, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  hudCenter: {
+    alignItems: 'center',
+    gap: 3,
+  },
+  scoreBar: {
+    borderRadius: 10,
+    paddingHorizontal: 2,
+    paddingVertical: 2,
+    borderWidth: 1.5,
+    borderColor: 'rgba(100,160,255,0.4)',
+    minWidth: 110,
+  },
+  scoreBarInner: {
+    backgroundColor: '#0C1A5A',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    alignItems: 'center',
+  },
+  scoreBarValue: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 1,
+    textShadowColor: 'rgba(100,180,255,0.6)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
+
+  hudRight: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  starWrap: {
+    width: 36, height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,215,0,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pauseBtn: {
+    width: 36, height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── Big score ──
+  bigScore: {
+    color: '#FFFFFF',
+    fontSize: 52,
+    fontWeight: '900',
+    letterSpacing: -1,
+    marginBottom: 4,
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+  },
+
+  // ── Combo banner ──
+  comboBannerWrap: {
+    height: 44, alignItems: 'center', justifyContent: 'center', marginBottom: 6,
+  },
   comboPill: {
     flexDirection: 'row', alignItems: 'center',
-    borderRadius: 22, paddingHorizontal: 16, paddingVertical: 8,
-    gap: 6, elevation: 8,
-    shadowColor: '#FF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 8,
+    borderRadius: 24, paddingHorizontal: 28, paddingVertical: 8, gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    elevation: 8,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 8,
   },
-  comboEmoji: { fontSize: 16 },
-  comboLabel: { color: '#FFFFFF', fontSize: 16, fontWeight: '800', letterSpacing: 0.5 },
-  comboBadge: { backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
-  comboBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  comboLabel: { color: '#3344AA', fontSize: 20, fontWeight: '900', letterSpacing: 0.5 },
+  comboCount: { color: '#FFD700', fontSize: 24, fontWeight: '900', letterSpacing: -0.5,
+    textShadowColor: 'rgba(200,100,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  comboBadge: {},
+  comboBadgeText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
 
-  // Board
+  // ── Board ──
   boardOuter: {
-    borderRadius: 16,
-    overflow: 'visible',
     elevation: 20,
-    shadowColor: '#4C9EFF',
+    shadowColor: '#1A2A6C',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.6,
     shadowRadius: 20,
+    position: 'relative',
   },
-  boardBg: {
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: 'rgba(76,158,255,0.2)',
+  boardShadow: {
+    borderRadius: 18,
     overflow: 'hidden',
-    backgroundColor: '#0D1B4B',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   flashOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    borderRadius: 16, backgroundColor: '#FFD700',
-    borderWidth: 3, borderColor: '#FFD700',
+    borderRadius: 18, backgroundColor: '#FFD600',
   },
 
-  // Tray
-  tray: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
-  trayInner: {
+  // ── Tray ──
+  tray: {
+    flex: 1,
     width: '100%',
-    backgroundColor: '#11112A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  trayCard: {
+    width: '100%',
+    backgroundColor: 'rgba(0,0,0,0.12)',
     borderRadius: 22,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    paddingTop: 8, paddingBottom: 12, paddingHorizontal: 8,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.12)',
+    paddingTop: 6,
+    paddingBottom: 12,
+    paddingHorizontal: 6,
+    overflow: 'hidden',
   },
-  trayHandle: {
-    width: 36, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignSelf: 'center', marginBottom: 10,
+  trayShine: {
+    position: 'absolute',
+    top: 0, left: 20, right: 20,
+    height: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 1,
   },
-  piecesRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
-  pieceSlot: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  slotBg: {
-    minWidth: 76, minHeight: 84,
+  piecesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingTop: 6,
+  },
+  pieceSlot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptySlot: {
+    width: 56, height: 56,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
-    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  slotEmpty: { borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.05)' },
 
-  // Drag overlay
-  dragOverlay: { position: 'absolute', top: 0, left: 0, width: SW, height: SH, zIndex: 9999 },
-  dragShadow: { position: 'absolute', top: 8, left: 4, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.3)' },
+  // ── Drag overlay ──
+  dragOverlay: {
+    position: 'absolute', top: 0, left: 0, width: SW, height: SH,
+    zIndex: 9999,
+  },
 });
