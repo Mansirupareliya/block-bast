@@ -3,18 +3,20 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   Platform, StatusBar, Animated,
 } from 'react-native';
+import { playTap } from '../utils/audioManager';
+import { NEON } from '../utils/theme';
 
 // Status bar height — computed once at module level
 const STATUS_H = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 44;
 
 /**
  * Game header matching reference image:
- *   👑 2299         ⚙️
+ *   👑 2299         ♡
  *
  * Props:
  *   subtitle   — best score number
  *   onBack     — called when back/settings pressed
- *   liked      — boolean heart state (unused in this layout)
+ *   liked      — boolean heart state
  *   onLike     — heart toggle
  *   headerAnim — optional Animated style
  */
@@ -26,11 +28,17 @@ export default function GameHeader({
   const likeScale = React.useRef(new Animated.Value(1)).current;
 
   const handleLike = () => {
+    playTap();
     Animated.sequence([
       Animated.spring(likeScale, { toValue: 1.5, friction: 3, useNativeDriver: true }),
       Animated.spring(likeScale, { toValue: 1,   friction: 5, useNativeDriver: true }),
     ]).start();
     onLike?.();
+  };
+
+  const handleBack = () => {
+    playTap();
+    onBack?.();
   };
 
   // Extract just the number from subtitle like "BEST: 2299"
@@ -45,7 +53,7 @@ export default function GameHeader({
 
         {/* LEFT — Back button (‹ chevron bare) */}
         <TouchableOpacity
-          onPress={onBack}
+          onPress={handleBack}
           activeOpacity={0.5}
           style={styles.leftSlot}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -68,7 +76,8 @@ export default function GameHeader({
           >
             <Animated.Text style={[
               styles.heartIcon,
-              { color: liked ? '#FF4466' : 'rgba(255,255,255,0.55)' },
+              { color: liked ? NEON.magenta : 'rgba(255,255,255,0.4)' },
+              liked && { textShadowColor: NEON.magenta, textShadowRadius: 10, textShadowOffset: { width: 0, height: 0 } },
               { transform: [{ scale: likeScale }] },
             ]}>
               {liked ? '♥' : '♡'}
@@ -106,7 +115,10 @@ const styles = StyleSheet.create({
     fontSize: 34,
     lineHeight: 38,
     fontWeight: '200',
-    color: 'rgba(255,255,255,0.9)',
+    color: NEON.cyan,
+    textShadowColor: NEON.cyan,
+    textShadowRadius: 10,
+    textShadowOffset: { width: 0, height: 0 },
     marginTop: -3,
   },
 
@@ -125,18 +137,19 @@ const styles = StyleSheet.create({
   bestScore: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#FFD700',
+    color: NEON.gold,
     letterSpacing: 0.5,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    textShadowColor: NEON.gold,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
 
-  // Right slot — heart
+  // Right slot — heart like button
   rightSlot: {
     width: 40,
-    alignItems: 'flex-end',
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   heartIcon: {
     fontSize: 22,

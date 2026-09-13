@@ -4,7 +4,7 @@ import {
   Dimensions, Animated, StatusBar, ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { playClick, playSuccess } from '../utils/audioManager';
+import { playTap, playFlip, playMatch, playMismatch, playWin } from '../utils/audioManager';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -151,7 +151,7 @@ export default function MatchmakerScreen({ onBack }) {
   const handleCardPress = useCallback((idx) => {
     if (!canFlip || cards[idx].flipped || cards[idx].matched || complete) return;
 
-    playClick();
+    playFlip();
 
     flipAnim(idx, () => {
       setCards(prev => {
@@ -172,7 +172,7 @@ export default function MatchmakerScreen({ onBack }) {
       const isMatch = cards[a].iconName === cards[b].iconName;
 
       if (isMatch) {
-        playSuccess();
+        playMatch();
         setScore(s => s + 50);
         setMatched(m => m + 1);
         setCards(prev => {
@@ -181,20 +181,21 @@ export default function MatchmakerScreen({ onBack }) {
           next[b] = { ...next[b], matched: true, flipped: true };
           return next;
         });
-        
+
         // Check win
         if (matched + 1 >= cfg.pairs) {
           setRunning(false);
           setComplete(true);
-          playSuccess();
+          playWin();
           setBestScore(prev => Math.max(prev, score + 50));
-          
+
           const nextLevel = Math.max(maxUnlockedLevel, cfg.level + 1);
           setMaxUnlockedLevel(nextLevel);
           globalUnlockedLevel = nextLevel;
         }
         setCanFlip(true);
       } else {
+        playMismatch();
         flipBackBoth(a, b, () => {
           setCards(prev => {
             const next = [...prev];
@@ -218,7 +219,7 @@ export default function MatchmakerScreen({ onBack }) {
         <Text style={startStyles.watermark}>?</Text>
         
         <View style={startStyles.header}>
-          <TouchableOpacity onPress={onBack} hitSlop={{top:20,bottom:20,left:20,right:20}}>
+          <TouchableOpacity onPress={() => { playTap(); onBack(); }} hitSlop={{top:20,bottom:20,left:20,right:20}}>
             <Text style={{fontSize: 24, color: '#333'}}>←</Text>
           </TouchableOpacity>
         </View>
@@ -229,7 +230,7 @@ export default function MatchmakerScreen({ onBack }) {
           
           <Text style={startStyles.desc}>Pairs are made in Matchmaker heaven. Start matching!</Text>
           
-          <TouchableOpacity style={startStyles.playBtn} activeOpacity={0.8} onPress={() => setView('levels')}>
+          <TouchableOpacity style={startStyles.playBtn} activeOpacity={0.8} onPress={() => { playTap(); setView('levels'); }}>
             <Text style={startStyles.playText}>Play</Text>
             <View style={startStyles.coin}><Text style={startStyles.coinText}>150</Text></View>
           </TouchableOpacity>
@@ -248,7 +249,7 @@ export default function MatchmakerScreen({ onBack }) {
         <StatusBar backgroundColor="transparent" barStyle="dark-content" translucent />
         
         <View style={[startStyles.header, { flexDirection: 'row', alignItems: 'center', marginBottom: 20 }]}>
-          <TouchableOpacity onPress={() => setView('start')} hitSlop={{top:20,bottom:20,left:20,right:20}}>
+          <TouchableOpacity onPress={() => { playTap(); setView('start'); }} hitSlop={{top:20,bottom:20,left:20,right:20}}>
             <Text style={{fontSize: 24, color: '#333', marginRight: 20}}>←</Text>
           </TouchableOpacity>
           <Text style={{ fontSize: 24, fontWeight: '800', color: '#111' }}>Levels</Text>
@@ -262,7 +263,7 @@ export default function MatchmakerScreen({ onBack }) {
                 <TouchableOpacity
                   key={i}
                   style={[startStyles.levelBtn, !unlocked && startStyles.levelBtnLocked]}
-                  onPress={() => unlocked && startLevel(l.level)}
+                  onPress={() => { if (unlocked) { playTap(); startLevel(l.level); } }}
                   activeOpacity={unlocked ? 0.8 : 1}
                 >
                   <Text style={[startStyles.levelBtnText, !unlocked && startStyles.levelBtnTextLocked]}>
@@ -287,7 +288,7 @@ export default function MatchmakerScreen({ onBack }) {
     <View style={gameStyles.root}>
       <StatusBar backgroundColor="transparent" barStyle="dark-content" translucent />
       <View style={{ paddingHorizontal: 20, paddingTop: 50, paddingBottom: 10 }}>
-        <TouchableOpacity onPress={() => setView('start')} hitSlop={{top:20,bottom:20,left:20,right:20}}>
+        <TouchableOpacity onPress={() => { playTap(); setView('start'); }} hitSlop={{top:20,bottom:20,left:20,right:20}}>
           <Text style={{fontSize: 28, color: '#333'}}>←</Text>
         </TouchableOpacity>
       </View>
@@ -322,9 +323,9 @@ export default function MatchmakerScreen({ onBack }) {
         <View style={[StyleSheet.absoluteFill, gameStyles.overlay]}>
           <View style={gameStyles.popup}>
             <Text style={gameStyles.popupTitle}>Level Complete!</Text>
-            <TouchableOpacity 
-              style={gameStyles.nextBtn} 
-              onPress={() => startLevel(cfg.level + 1)}
+            <TouchableOpacity
+              style={gameStyles.nextBtn}
+              onPress={() => { playTap(); startLevel(cfg.level + 1); }}
             >
               <Text style={gameStyles.nextBtnText}>Next Level</Text>
             </TouchableOpacity>

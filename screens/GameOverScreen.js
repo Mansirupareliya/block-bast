@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { playTap, playSuccess } from '../utils/audioManager';
+import { NEON } from '../utils/theme';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -60,6 +62,9 @@ export default function GameOverScreen({ score, bestScore, onRestart, onBack }) 
   const stars       = score >= 3000 ? 3 : score >= 1200 ? 2 : score >= 400 ? 1 : 0;
 
   useEffect(() => {
+    // Celebratory chime when the run set a new best score.
+    if (isNewRecord) playSuccess();
+
     Animated.parallel([
       Animated.timing(overlayOp, { toValue: 1, duration: 300, useNativeDriver: true }),
       Animated.sequence([
@@ -92,7 +97,7 @@ export default function GameOverScreen({ score, bestScore, onRestart, onBack }) 
       <Animated.View style={[styles.card, { opacity: cardOpacity, transform: [{ scale: cardScale }] }]}>
         {/* Dark glass background */}
         <LinearGradient
-          colors={['#101F70', '#0A1550', '#080F3A']}
+          colors={['#1A1440', '#0B0B1A', '#05050F']}
           style={styles.gradient}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         >
@@ -104,7 +109,7 @@ export default function GameOverScreen({ score, bestScore, onRestart, onBack }) 
           {isNewRecord ? (
             <View style={styles.newRecordWrap}>
               <LinearGradient
-                colors={['#FFD700', '#FF8C00']}
+                colors={[NEON.magenta, NEON.violet]}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={styles.newRecordBadge}
               >
@@ -160,13 +165,13 @@ export default function GameOverScreen({ score, bestScore, onRestart, onBack }) 
           {/* Play again */}
           <Animated.View style={{ transform: [{ scale: btnScale }], width: '100%' }}>
             <TouchableOpacity
-              onPress={onRestart}
+              onPress={() => { playTap(); onRestart?.(); }}
               onPressIn={onPressIn}
               onPressOut={onPressOut}
               activeOpacity={1}
             >
               <LinearGradient
-                colors={['#FFD700', '#FF9500', '#FF6000']}
+                colors={[NEON.cyan, NEON.violet, NEON.magenta]}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={styles.btn}
               >
@@ -178,7 +183,7 @@ export default function GameOverScreen({ score, bestScore, onRestart, onBack }) 
 
           {/* Back to home */}
           {onBack && (
-            <TouchableOpacity onPress={onBack} style={styles.homeBtn} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => { playTap(); onBack(); }} style={styles.homeBtn} activeOpacity={0.7}>
               <Text style={styles.homeBtnText}>Back to Home</Text>
             </TouchableOpacity>
           )}
@@ -199,39 +204,39 @@ const styles = StyleSheet.create({
     width: SW * 0.84,
     borderRadius: 28, overflow: 'hidden',
     borderWidth: 1.5,
-    borderColor: 'rgba(60,120,255,0.35)',
+    borderColor: NEON.violetDim,
     elevation: 30,
-    shadowColor: '#2255FF',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.4, shadowRadius: 24,
+    shadowColor: NEON.violet,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5, shadowRadius: 26,
   },
   gradient: { padding: 28, alignItems: 'center', overflow: 'hidden' },
 
   blobTL: {
     position: 'absolute', top: -50, left: -50,
     width: 150, height: 150, borderRadius: 75,
-    backgroundColor: 'rgba(60,80,255,0.12)',
+    backgroundColor: NEON.cyan, opacity: 0.10,
   },
   blobBR: {
     position: 'absolute', bottom: -40, right: -40,
     width: 120, height: 120, borderRadius: 60,
-    backgroundColor: 'rgba(120,0,220,0.1)',
+    backgroundColor: NEON.magenta, opacity: 0.10,
   },
 
   newRecordWrap: { marginBottom: 14 },
   newRecordBadge: {
     borderRadius: 16, paddingHorizontal: 20, paddingVertical: 8,
     elevation: 8,
-    shadowColor: '#FF8C00', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.5, shadowRadius: 8,
+    shadowColor: NEON.magenta, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 12,
   },
   newRecordText: { color: '#FFFFFF', fontSize: 20, fontWeight: '900', letterSpacing: 2 },
 
   title: {
     color: '#FFFFFF', fontSize: 28, fontWeight: '900', letterSpacing: 4,
     marginBottom: 14,
-    textShadowColor: 'rgba(100,150,255,0.4)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+    textShadowColor: NEON.cyan,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 12,
   },
 
   starsRow: { flexDirection: 'row', marginBottom: 20, alignItems: 'center' },
@@ -300,7 +305,7 @@ const styles = StyleSheet.create({
     borderRadius: 32, paddingVertical: 16,
     alignItems: 'center',
     elevation: 10,
-    shadowColor: '#FF8C00', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.5, shadowRadius: 12,
+    shadowColor: NEON.cyan, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 14,
     overflow: 'hidden',
   },
   btnShine: {

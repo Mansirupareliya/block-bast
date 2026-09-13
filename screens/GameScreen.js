@@ -4,13 +4,17 @@ import {
   Platform, Animated, TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { NEON } from '../utils/theme';
 import Board from '../components/Board';
+import GhostLayer from '../components/GhostLayer';
 import DraggablePiece from '../components/DraggablePiece';
 import PieceView from '../components/PieceView';
 import ScoreAnimation from '../components/ScoreAnimation';
 import GameOverScreen from './GameOverScreen';
 import GameHeader, { STATUS_H } from '../components/GameHeader';
-import { playClick, playSuccess, playFail } from '../utils/audioManager';
+import {
+  playClick, playTap, playSuccess, playFail,
+} from '../utils/audioManager';
 import {
   BOARD_SIZE, createEmptyBoard, getRandomPieces,
   canPlacePiece, placePiece, clearLines,
@@ -232,9 +236,10 @@ export default function GameScreen({ onBack }) {
   const handleDragStart = useCallback((idx, px, py) => {
     const piece = piecesState.current[idx];
     if (!piece) return;
+    playTap();
     dragPan.setValue({ x: px, y: py });
     setDragging({ pieceIdx: idx, piece });
-    
+
     lastGhost.current = { row: -1, col: -1 };
     setGhostCells(calcGhost(px, py, piece, boardState.current));
   }, [calcGhost, dragPan]);
@@ -243,7 +248,7 @@ export default function GameScreen({ onBack }) {
     const piece = piecesState.current[idx];
     if (!piece) return;
     dragPan.setValue({ x: px, y: py });
-    
+
     // Only update ghost cells if the grid position changed
     const { row, col } = getBoardCell(px, py, piece.shape);
     if (lastGhost.current.row !== row || lastGhost.current.col !== col) {
@@ -336,13 +341,15 @@ export default function GameScreen({ onBack }) {
     setIsGameOver(false); setDragging(null);
   }, []);
 
+  // Drag overlay follows the finger via `dragPan`, updated from
+  // handleDragStart/handleDragMove as the piece is dragged.
   const getOverlayTransform = () => {
     if (!dragging) return [];
     const ox = (dragging.piece.shape[0].length * CELL_SIZE) / 2;
     const oy = containerPageY.current + (dragging.piece.shape.length * CELL_SIZE) + PIECE_GAP;
     return [
       { translateX: Animated.subtract(dragPan.x, ox) },
-      { translateY: Animated.subtract(dragPan.y, oy) }
+      { translateY: Animated.subtract(dragPan.y, oy) },
     ];
   };
 
@@ -352,11 +359,13 @@ export default function GameScreen({ onBack }) {
     <View style={styles.root} ref={containerRef} onLayout={measureBoard} collapsable={false}>
       <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
 
-      {/* ── Bright periwinkle blue background (matches image 1) ── */}
+      {/* ── Neon Arcade backdrop: near-black with glowing corner blobs ── */}
       <LinearGradient
-        colors={['#6678D8', '#5568C8', '#4D60C0', '#4558B8']}
+        colors={['#14142E', '#0B0B1A', '#05050F']}
         style={StyleSheet.absoluteFill}
       />
+      <View style={styles.glowBlobCyan} />
+      <View style={styles.glowBlobMagenta} />
 
       {/* Subtle top vignette for depth */}
       <View style={styles.topVignette} />
@@ -395,10 +404,10 @@ export default function GameScreen({ onBack }) {
           <View ref={boardRef} collapsable={false} onLayout={measureBoard}>
             <Board
               board={board}
-              ghostCells={ghostCells}
               highlightCells={clearedCells}
               cellSize={CELL_SIZE}
             />
+            <GhostLayer ghostCells={ghostCells} cellSize={CELL_SIZE} dragKey={dragging} />
           </View>
         </View>
         <Animated.View
@@ -450,10 +459,10 @@ export default function GameScreen({ onBack }) {
             transform: getOverlayTransform(),
             // Floating shadow glow
             elevation: 24,
-            shadowColor: '#44AAFF',
+            shadowColor: NEON.cyan,
             shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.7,
-            shadowRadius: 18,
+            shadowOpacity: 0.85,
+            shadowRadius: 20,
           }}>
             <PieceView piece={dragging.piece} cellSize={CELL_SIZE} />
           </Animated.View>
@@ -479,106 +488,17 @@ const styles = StyleSheet.create({
   topVignette: {
     position: 'absolute', top: 0, left: 0, right: 0,
     height: 220,
-    backgroundColor: 'rgba(0,0,0,0.08)',
+    backgroundColor: 'rgba(0,0,0,0.18)',
   },
-
-  // ── HUD Bar ──
-  hudBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    paddingHorizontal: 10,
-    marginBottom: 2,
-    height: 56,
+  glowBlobCyan: {
+    position: 'absolute', top: -80, left: -80,
+    width: 220, height: 220, borderRadius: 110,
+    backgroundColor: NEON.cyan, opacity: 0.10,
   },
-
-  hudLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  backBtn: {
-    width: 32, height: 32, borderRadius: 9,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  backIcon: { color: '#FFFFFF', fontSize: 22, lineHeight: 28, marginLeft: -1 },
-
-  trophyBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,215,0,0.1)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,215,0,0.3)',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    gap: 5,
-  },
-  trophyIconWrap: { width: 20, height: 20 },
-  bestScorePill: {},
-  bestScoreValue: {
-    color: '#FFD700',
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-
-  hudCenter: {
-    alignItems: 'center',
-    gap: 3,
-  },
-  scoreBar: {
-    borderRadius: 10,
-    paddingHorizontal: 2,
-    paddingVertical: 2,
-    borderWidth: 1.5,
-    borderColor: 'rgba(100,160,255,0.4)',
-    minWidth: 110,
-  },
-  scoreBarInner: {
-    backgroundColor: '#0C1A5A',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    alignItems: 'center',
-  },
-  scoreBarValue: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 1,
-    textShadowColor: 'rgba(100,180,255,0.6)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
-  },
-
-  hudRight: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 8,
-  },
-  starWrap: {
-    width: 36, height: 36,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,215,0,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,215,0,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pauseBtn: {
-    width: 36, height: 36,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  glowBlobMagenta: {
+    position: 'absolute', top: 120, right: -100,
+    width: 260, height: 260, borderRadius: 130,
+    backgroundColor: NEON.magenta, opacity: 0.08,
   },
 
   // ── Big score ──
@@ -588,9 +508,9 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: -1,
     marginBottom: 4,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+    textShadowColor: NEON.cyan,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 14,
   },
 
   // ── Combo banner ──
@@ -600,34 +520,34 @@ const styles = StyleSheet.create({
   comboPill: {
     flexDirection: 'row', alignItems: 'center',
     borderRadius: 24, paddingHorizontal: 28, paddingVertical: 8, gap: 10,
-    backgroundColor: 'rgba(255,255,255,0.88)',
+    backgroundColor: NEON.glassFill,
+    borderWidth: 1.5,
+    borderColor: NEON.magenta,
     elevation: 8,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 8,
+    shadowColor: NEON.magenta, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 12,
   },
-  comboLabel: { color: '#3344AA', fontSize: 20, fontWeight: '900', letterSpacing: 0.5 },
-  comboCount: { color: '#FFD700', fontSize: 24, fontWeight: '900', letterSpacing: -0.5,
-    textShadowColor: 'rgba(200,100,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
-  comboBadge: {},
-  comboBadgeText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  comboLabel: { color: '#FFFFFF', fontSize: 20, fontWeight: '900', letterSpacing: 0.5 },
+  comboCount: { color: NEON.cyan, fontSize: 24, fontWeight: '900', letterSpacing: -0.5,
+    textShadowColor: NEON.cyan, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 },
 
   // ── Board ──
   boardOuter: {
     elevation: 20,
-    shadowColor: '#1A2A6C',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.6,
-    shadowRadius: 20,
+    shadowColor: NEON.cyan,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 22,
     position: 'relative',
   },
   boardShadow: {
     borderRadius: 18,
     overflow: 'hidden',
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: NEON.cyanDim,
   },
   flashOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    borderRadius: 18, backgroundColor: '#FFD600',
+    borderRadius: 18, backgroundColor: NEON.cyan,
   },
 
   // ── Tray ──
@@ -641,10 +561,10 @@ const styles = StyleSheet.create({
   },
   trayCard: {
     width: '100%',
-    backgroundColor: 'rgba(0,0,0,0.12)',
+    backgroundColor: NEON.glassFill,
     borderRadius: 22,
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: NEON.violetDim,
     paddingTop: 6,
     paddingBottom: 12,
     paddingHorizontal: 6,
@@ -654,7 +574,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0, left: 20, right: 20,
     height: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: NEON.violet,
+    opacity: 0.4,
     borderRadius: 1,
   },
   piecesRow: {
@@ -671,9 +592,9 @@ const styles = StyleSheet.create({
   emptySlot: {
     width: 56, height: 56,
     borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.1)',
+    backgroundColor: 'rgba(139,44,255,0.06)',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: NEON.violetDim,
   },
 
   // ── Drag overlay ──

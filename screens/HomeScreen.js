@@ -5,6 +5,8 @@ import {
   ScrollView, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { playTap } from '../utils/audioManager';
+import { NEON } from '../utils/theme';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -59,12 +61,16 @@ function GameTile({ game, onPress, liked, onLike, enterAnim }) {
   return (
     <Animated.View style={[{ width: TILE_W }, enterAnim]}>
       <TouchableOpacity
-        onPress={() => onPress(game.id)}
+        onPress={() => { playTap(); onPress(game.id); }}
         onPressIn={onIn}
         onPressOut={onOut}
         activeOpacity={1}
       >
-        <Animated.View style={[styles.tile, { transform: [{ scale: pressScale }] }]}>
+        <Animated.View style={[
+          styles.tile,
+          { borderColor: game.accent + '55', shadowColor: game.accent },
+          { transform: [{ scale: pressScale }] },
+        ]}>
 
           {/* Game image fills the art area */}
           <View style={styles.tileArt}>
@@ -75,13 +81,13 @@ function GameTile({ game, onPress, liked, onLike, enterAnim }) {
             />
             {/* Heart button top-right */}
             <TouchableOpacity
-              onPress={() => onLike(game.id)}
+              onPress={() => { playTap(); onLike(game.id); }}
               style={styles.heartBtn}
               activeOpacity={0.8}
               hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
             >
-              <View style={[styles.heartPill, { backgroundColor: liked ? '#FF446622' : 'rgba(255,255,255,0.85)' }]}>
-                <Text style={[styles.heartIcon, { color: liked ? '#FF4466' : '#AAAAAA' }]}>
+              <View style={[styles.heartPill, liked && { borderColor: NEON.magenta }]}>
+                <Text style={[styles.heartIcon, { color: liked ? NEON.magenta : 'rgba(255,255,255,0.6)' }]}>
                   {liked ? '♥' : '♡'}
                 </Text>
               </View>
@@ -146,12 +152,12 @@ export default function HomeScreen({ onSelect }) {
 
   return (
     <View style={styles.root}>
-      <StatusBar backgroundColor="transparent" barStyle="dark-content" translucent />
+      <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
 
-      {/* White background */}
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#F7F9FF' }]} />
+      {/* Neon Arcade backdrop */}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: NEON.bg0 }]} />
 
-      {/* Subtle soft blobs */}
+      {/* Glowing ambient blobs */}
       <View style={styles.blobBlue} />
       <View style={styles.blobPurple} />
 
@@ -166,7 +172,7 @@ export default function HomeScreen({ onSelect }) {
         <View style={styles.tabBar}>
           <TouchableOpacity
             style={[styles.tab, tab === 'all' && styles.tabActive]}
-            onPress={() => setTab('all')}
+            onPress={() => { playTap(); setTab('all'); }}
             activeOpacity={0.8}
           >
             <Text style={[styles.tabTxt, tab === 'all' && styles.tabTxtActive]}>All Games</Text>
@@ -174,7 +180,7 @@ export default function HomeScreen({ onSelect }) {
 
           <TouchableOpacity
             style={[styles.tab, tab === 'favorites' && styles.tabActive]}
-            onPress={() => setTab('favorites')}
+            onPress={() => { playTap(); setTab('favorites'); }}
             activeOpacity={0.8}
           >
             <Text style={[styles.tabTxt, tab === 'favorites' && styles.tabTxtActive]}>
@@ -229,16 +235,16 @@ export default function HomeScreen({ onSelect }) {
 const styles = StyleSheet.create({
   root: { flex: 1 },
 
-  // Background blobs
+  // Glowing ambient blobs
   blobBlue: {
     position: 'absolute', top: -100, left: SW / 2 - 150,
     width: 300, height: 300, borderRadius: 150,
-    backgroundColor: '#DBEAFE', opacity: 0.7,
+    backgroundColor: NEON.cyan, opacity: 0.10,
   },
   blobPurple: {
     position: 'absolute', top: -50, right: -60,
-    width: 180, height: 180, borderRadius: 90,
-    backgroundColor: '#EDE9FE', opacity: 0.6,
+    width: 220, height: 220, borderRadius: 110,
+    backgroundColor: NEON.magenta, opacity: 0.09,
   },
 
   // ── Header ──
@@ -247,55 +253,14 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     backgroundColor: 'transparent',
   },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-
-  liveBadge: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  liveDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#4C9EFF', marginRight: 6 },
-  liveTxt:   { fontSize: 10, fontWeight: '700', letterSpacing: 2.5, color: '#9CA3AF' },
-
-  headline: { fontSize: 32, fontWeight: '900', color: '#111827', letterSpacing: -0.5 },
-  accentWord: {
-    color: '#4C9EFF',
-    textShadowColor: 'rgba(76,158,255,0.2)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
-  },
-
-  // Trophy button
-  trophyBtn: {
-    marginTop: 4,
-    borderRadius: 16, overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#FFB800', shadowOpacity: 0.3, shadowOffset: { width: 0, height: 3 }, shadowRadius: 6,
-  },
-  trophyGrad: {
-    width: 48, height: 48,
-    borderRadius: 16,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  cupBowl: {
-    position: 'absolute', top: 8, left: 10, right: 10, height: 16,
-    backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 8,
-  },
-  cupStem: {
-    position: 'absolute', top: 24, left: 20, right: 20, height: 10,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-  },
-  cupBase: {
-    position: 'absolute', bottom: 8, left: 10, right: 10, height: 5,
-    backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 3,
-  },
 
   // ── Tab bar ──
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#ECEEF5',
+    backgroundColor: NEON.glassFill,
     borderRadius: 14,
+    borderWidth: 1,
+    borderColor: NEON.violetDim,
     padding: 4,
   },
   tab: {
@@ -305,15 +270,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
+    backgroundColor: 'rgba(0,240,255,0.12)',
+    borderWidth: 1,
+    borderColor: NEON.cyan,
+    shadowColor: NEON.cyan,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 8,
     elevation: 2,
   },
-  tabTxt:       { fontSize: 13, fontWeight: '600', color: '#9CA3AF' },
-  tabTxtActive: { color: '#111827', fontWeight: '700' },
+  tabTxt:       { fontSize: 13, fontWeight: '600', color: NEON.textDim },
+  tabTxtActive: { color: '#FFFFFF', fontWeight: '700' },
 
   // ── Game grid ──
   grid:    { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 },
@@ -322,22 +289,20 @@ const styles = StyleSheet.create({
   // ── Game tile ──
   tile: {
     width: TILE_W,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: NEON.glassFill,
     borderRadius: 18,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.07)',
+    borderWidth: 1.5,
     elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.09,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
     shadowRadius: 10,
     marginBottom: 0,
   },
   tileArt: {
     height: TILE_H * 0.62,
     overflow: 'hidden',
-    backgroundColor: '#F0F0F0',
+    backgroundColor: NEON.bg2,
   },
   tileImage: {
     width: '100%',
@@ -351,10 +316,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: 'rgba(5,5,15,0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   heartIcon: {
     fontSize: 15,
@@ -362,12 +326,12 @@ const styles = StyleSheet.create({
   },
   tileInfo: {
     padding: 9,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
   },
   tileName: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#111827',
+    color: '#FFFFFF',
     letterSpacing: -0.1,
     marginBottom: 5,
   },
@@ -388,15 +352,15 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     alignItems: 'center',
   },
-  emptyIcon:  { fontSize: 52, color: '#E5E7EB', marginBottom: 14 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#6B7280', marginBottom: 6 },
-  emptySub:   { fontSize: 13, color: '#9CA3AF', textAlign: 'center' },
+  emptyIcon:  { fontSize: 52, color: NEON.violetDim, marginBottom: 14 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: NEON.textDim, marginBottom: 6 },
+  emptySub:   { fontSize: 13, color: NEON.textFaint, textAlign: 'center' },
 
   // ── Footer ──
   footer: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     marginTop: 20, gap: 10,
   },
-  footerDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.12)' },
-  footerTxt: { color: '#9CA3AF', fontSize: 12, letterSpacing: 0.4 },
+  footerDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: NEON.violetDim },
+  footerTxt: { color: NEON.textFaint, fontSize: 12, letterSpacing: 0.4 },
 });

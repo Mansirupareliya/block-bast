@@ -26,6 +26,9 @@
         "projectId": "39a183f0-4fa5-436b-8848-2c0437b69e9e"
       }
     },
-    "owner": "mansirupareliyas-team"
+    "owner": "mansirupareliyas-team",
+    "plugins": [
+      "expo-audio"
+    ]
   }
 }

@@ -4,6 +4,7 @@ import {
   Dimensions, StatusBar, ScrollView,
   PanResponder, Animated, Image
 } from 'react-native';
+import { playTap, playClick, playSuccess } from '../utils/audioManager';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -275,7 +276,7 @@ export default function DogsBlocksScreen({ onBack }) {
     if (!piece || isPiecePlaced(pieceId)) return false;
 
     const abs = getAbsCells(piece, row, col);
-    
+
     // Check if every part of the piece lands in a valid empty hole and is not overlapping
     const valid = abs.every(([ar, ac]) =>
       emptyCells.some(([er, ec]) => er === ar && ec === ac) &&
@@ -283,12 +284,15 @@ export default function DogsBlocksScreen({ onBack }) {
     );
     if (!valid) return false;
 
+    playClick();
+
     const newPlaced = [...placed, { pieceId, anchorR: row, anchorC: col }];
     setPlaced(newPlaced);
 
     // Win condition: All pieces are placed
     if (newPlaced.length === pieces.length) {
       setComplete(true);
+      playSuccess();
       const next = Math.max(maxUnlocked, levelIdx + 2);
       setMaxUnlocked(next);
       globalUnlocked = next;
@@ -313,7 +317,7 @@ export default function DogsBlocksScreen({ onBack }) {
       <View style={s.root}>
         <StatusBar backgroundColor="transparent" barStyle="dark-content" translucent />
         <View style={s.topBar}>
-          <TouchableOpacity onPress={onBack} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
+          <TouchableOpacity onPress={() => { playTap(); onBack(); }} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
             <Text style={s.backArrow}>←</Text>
           </TouchableOpacity>
           <Text style={s.topTitle}>Levels</Text>
@@ -327,7 +331,7 @@ export default function DogsBlocksScreen({ onBack }) {
               <TouchableOpacity
                 key={i}
                 style={[s.lvlBtn, locked && s.lvlBtnLocked]}
-                onPress={() => !locked && startLevel(i)}
+                onPress={() => { if (!locked) { playTap(); startLevel(i); } }}
                 activeOpacity={locked ? 1 : 0.8}
               >
                 <Text style={[s.lvlBtnText, locked && s.lvlBtnTextLocked]}>
@@ -346,13 +350,13 @@ export default function DogsBlocksScreen({ onBack }) {
       <StatusBar backgroundColor="transparent" barStyle="dark-content" translucent />
 
       <View style={s.topBar}>
-        <TouchableOpacity onPress={() => setView('levels')} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
+        <TouchableOpacity onPress={() => { playTap(); setView('levels'); }} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
           <Text style={s.backArrow}>←</Text>
         </TouchableOpacity>
         <View style={s.levelBadge}>
           <Text style={s.levelBadgeText}>Level-{levelIdx + 1}</Text>
         </View>
-        <TouchableOpacity onPress={() => startLevel(levelIdx)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity onPress={() => { playTap(); startLevel(levelIdx); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Text style={{ fontSize: 22 }}>🔄</Text>
         </TouchableOpacity>
       </View>
@@ -436,14 +440,14 @@ export default function DogsBlocksScreen({ onBack }) {
             <Text style={s.completeTitle}>Level Completed!</Text>
             <View style={{ height: 20 }} />
             {levelIdx + 1 < LEVEL_DATA.length && (
-              <TouchableOpacity style={s.nextBtn} onPress={() => startLevel(levelIdx + 1)}>
+              <TouchableOpacity style={s.nextBtn} onPress={() => { playTap(); startLevel(levelIdx + 1); }}>
                 <Text style={s.nextBtnText}>Next Level</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={s.replayBtn} onPress={() => startLevel(levelIdx)}>
+            <TouchableOpacity style={s.replayBtn} onPress={() => { playTap(); startLevel(levelIdx); }}>
               <Text style={s.replayBtnText}>Replay</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setView('levels')} style={{ marginTop: 12 }}>
+            <TouchableOpacity onPress={() => { playTap(); setView('levels'); }} style={{ marginTop: 12 }}>
               <Text style={{ color: '#999', fontSize: 16 }}>All Levels</Text>
             </TouchableOpacity>
           </View>

@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { View, PanResponder, Dimensions, Animated } from 'react-native';
+import { PanResponder, Dimensions, Animated } from 'react-native';
 import PieceView from './PieceView';
 
 const { width: SW } = Dimensions.get('window');
@@ -65,4 +65,3 @@ export default function DraggablePiece({
     </Animated.View>
   );
 }
-

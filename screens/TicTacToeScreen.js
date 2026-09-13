@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { checkWinner, getBestMove } from '../utils/tictactoeAI';
-import { playClick, playSuccess } from '../utils/audioManager';
+import { playClick, playTap, playSuccess } from '../utils/audioManager';
 
 const { width: SW } = Dimensions.get('window');
 const BOARD_W = SW - 64;
@@ -138,19 +138,19 @@ export default function TicTacToeScreen({ onBack }) {
         
         <View style={styles.menuBox}>
           <Text style={styles.menuTitle}>TIC TAC TOE</Text>
-          <TouchableOpacity onPress={() => startNameEntry('ai')} style={styles.menuBtn} activeOpacity={0.8}>
+          <TouchableOpacity onPress={() => { playTap(); startNameEntry('ai'); }} style={styles.menuBtn} activeOpacity={0.8}>
             <LinearGradient colors={['#4C9EFF','#0A55CC']} style={styles.menuBtnGrad} start={{x:0, y:0}} end={{x:1, y:1}}>
               <Text style={styles.menuBtnTxt}>Single Player (vs AI)</Text>
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => startNameEntry('pvp')} style={styles.menuBtn} activeOpacity={0.8}>
+          <TouchableOpacity onPress={() => { playTap(); startNameEntry('pvp'); }} style={styles.menuBtn} activeOpacity={0.8}>
             <LinearGradient colors={['#FF6B6B','#AA0022']} style={styles.menuBtnGrad} start={{x:0, y:0}} end={{x:1, y:1}}>
               <Text style={styles.menuBtnTxt}>Play with Friend</Text>
             </LinearGradient>
           </TouchableOpacity>
-          
-          <TouchableOpacity onPress={onBack} style={{marginTop: 20}}>
+
+          <TouchableOpacity onPress={() => { playTap(); onBack(); }} style={{marginTop: 20}}>
             <Text style={{color: '#FFF', fontSize: 16, fontWeight: '700'}}>Back to Hub</Text>
           </TouchableOpacity>
         </View>
@@ -187,13 +187,13 @@ export default function TicTacToeScreen({ onBack }) {
             placeholderTextColor="rgba(255,255,255,0.5)"
           />
 
-          <TouchableOpacity onPress={startGame} style={styles.menuBtn} activeOpacity={0.8}>
+          <TouchableOpacity onPress={() => { playTap(); startGame(); }} style={styles.menuBtn} activeOpacity={0.8}>
             <LinearGradient colors={['#43A047','#2E7D32']} style={styles.menuBtnGrad} start={{x:0, y:0}} end={{x:1, y:1}}>
               <Text style={styles.menuBtnTxt}>Start Game</Text>
             </LinearGradient>
           </TouchableOpacity>
-          
-          <TouchableOpacity onPress={() => setGameState('menu')} style={{marginTop: 20}}>
+
+          <TouchableOpacity onPress={() => { playTap(); setGameState('menu'); }} style={{marginTop: 20}}>
             <Text style={{color: '#FFF', fontSize: 16, fontWeight: '700'}}>Back</Text>
           </TouchableOpacity>
         </View>
@@ -249,10 +249,10 @@ export default function TicTacToeScreen({ onBack }) {
 
       {/* Top Header Buttons */}
       <View style={[styles.topBar, { paddingTop: STATUS_H + 10 }]}>
-        <TouchableOpacity onPress={() => setGameState('menu')} style={styles.iconBtn}>
+        <TouchableOpacity onPress={() => { playTap(); setGameState('menu'); }} style={styles.iconBtn}>
           <Text style={styles.iconBtnTxt}>‹</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={restart} style={styles.iconBtn}>
+        <TouchableOpacity onPress={() => { playTap(); restart(); }} style={styles.iconBtn}>
           <Text style={[styles.iconBtnTxt, { fontSize: 22, marginTop: -2 }]}>↻</Text>
         </TouchableOpacity>
       </View>
@@ -320,7 +320,7 @@ export default function TicTacToeScreen({ onBack }) {
           <Text style={styles.resultText}>
             {result.winner === 'X' ? `${p1Name} Wins!` : result.winner === 'O' ? `${p2Name} Wins!` : "It's a Draw!"}
           </Text>
-          <TouchableOpacity onPress={restart} style={styles.nextBtn}>
+          <TouchableOpacity onPress={() => { playTap(); restart(); }} style={styles.nextBtn}>
             <LinearGradient colors={['#43A047','#2E7D32']} style={styles.nextBtnGrad} start={{x:0, y:0}} end={{x:1, y:1}}>
               <Text style={styles.nextBtnTxt}>Next Round</Text>
             </LinearGradient>
