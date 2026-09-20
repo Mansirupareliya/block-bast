@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { PanResponder, Dimensions, Animated } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { PanResponder, Dimensions, Animated, Easing } from 'react-native';
 import PieceView from './PieceView';
 
 const { width: SW } = Dimensions.get('window');
@@ -20,6 +20,32 @@ export default function DraggablePiece({
 
   // Scale spring for lift effect in tray (before the overlay takes over)
   const liftScale = useRef(new Animated.Value(1)).current;
+
+  // Fades the tray slot out the instant it's picked up (and back in if the
+  // drag is cancelled) instead of the old hard opacity:0/1 cut, so the
+  // handoff to the drag overlay reads as one continuous piece rather than
+  // a flicker.
+  const dragFade = useRef(new Animated.Value(isDragging ? 0 : 1)).current;
+  useEffect(() => {
+    Animated.timing(dragFade, {
+      toValue: isDragging ? 0 : 1,
+      duration: 100,
+      useNativeDriver: true,
+    }).start();
+  }, [isDragging, dragFade]);
+
+  // Entrance pop — this component only mounts fresh when a slot goes from
+  // empty back to holding a piece (GameScreen swaps between DraggablePiece
+  // and a plain empty-slot View), so a plain mount effect is exactly "a new
+  // piece just landed in the tray" and needs no extra tracking.
+  const enterScale   = useRef(new Animated.Value(0.3)).current;
+  const enterOpacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(enterScale, { toValue: 1, friction: 5, tension: 180, useNativeDriver: true }),
+      Animated.timing(enterOpacity, { toValue: 1, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+    ]).start();
+  }, []);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -51,13 +77,13 @@ export default function DraggablePiece({
   return (
     <Animated.View
       style={{
-        opacity: isDragging ? 0 : 1,
+        opacity: Animated.multiply(dragFade, enterOpacity),
         alignItems: 'center',
         justifyContent: 'center',
         minWidth: cellSize * 4,
         minHeight: cellSize * 4,
         padding: 6,
-        transform: [{ scale: liftScale }],
+        transform: [{ scale: Animated.multiply(liftScale, enterScale) }],
       }}
       {...panResponder.panHandlers}
     >

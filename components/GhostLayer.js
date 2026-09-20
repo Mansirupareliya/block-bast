@@ -2,10 +2,10 @@ import React, { useEffect, useRef, memo } from 'react';
 import { View, StyleSheet, Animated, Easing } from 'react-native';
 import { NEON } from '../utils/theme';
 
-// 4px = Board.js's own `padding: 2` + `borderWidth: 2` — the inset from the
+// 6px = Board.js's own `padding: 2` + `borderWidth: 4` — the inset from the
 // board's outer edge to the top-left of cell (0,0). Kept in sync with the
 // BOARD_OFFSET constant in GameScreen.js (same underlying geometry).
-const BOARD_OFFSET = 4;
+const BOARD_OFFSET = 6;
 
 // ── Animated Ghost Cell — a single pulsing placement-preview cell ─────────
 // Bright, clearly-visible cyan glow (not a subtle tint) with a soft outer
@@ -97,7 +97,7 @@ function GhostLayer({ ghostCells, cellSize, dragKey }) {
   }, [ghostCells, cellSize]);
 
   if (cells.length === 0) return null;
-  const br = Math.max(7, Math.round(cellSize * 0.30));
+  const br = Math.max(3, Math.round(cellSize * 0.1));
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">

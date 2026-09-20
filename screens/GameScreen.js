@@ -1,12 +1,11 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Dimensions, StatusBar,
   Platform, Animated, TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { NEON } from '../utils/theme';
+import { THEME, cartoonShadow } from '../utils/blockBlastTheme';
 import Board from '../components/Board';
-import GhostLayer from '../components/GhostLayer';
 import DraggablePiece from '../components/DraggablePiece';
 import PieceView from '../components/PieceView';
 import ScoreAnimation from '../components/ScoreAnimation';
@@ -15,6 +14,7 @@ import GameHeader, { STATUS_H } from '../components/GameHeader';
 import {
   playClick, playTap, playSuccess, playFail,
 } from '../utils/audioManager';
+import { STORAGE_KEYS, loadNumber, saveNumber } from '../utils/storage';
 import {
   BOARD_SIZE, createEmptyBoard, getRandomPieces,
   canPlacePiece, placePiece, clearLines,
@@ -23,7 +23,7 @@ import {
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const CELL_SIZE    = Math.floor((SW - 32) / BOARD_SIZE);
-const BOARD_OFFSET = 4;   // board padding(2) + borderWidth(2)
+const BOARD_OFFSET = 6;   // board padding(2) + borderWidth(4), must match Board.js's own style
 const PIECE_GAP    = 18;  // px gap between dragged-piece bottom and finger
 
 // ── View-drawn trophy icon ────────────────────────────────────────────────
@@ -168,13 +168,18 @@ function PauseIcon({ size = 16 }) {
   );
 }
 
+// Kept as an in-session cache (mirrors the same pattern used for level
+// unlocks in DogsBlocksScreen/MemoryMatchScreen) so re-entering this screen
+// within one app run doesn't flash back to 0 while the persisted value
+// loads from storage.
+let globalBestScore = 0;
+
 export default function GameScreen({ onBack }) {
   const [board,        setBoard]        = useState(createEmptyBoard);
   const [pieces,       setPieces]       = useState(() => getRandomPieces(3));
   const [score,        setScore]        = useState(0);
-  const [bestScore,    setBestScore]    = useState(0);
+  const [bestScore,    setBestScore]    = useState(globalBestScore);
   const [combo,        setCombo]        = useState(0);
-  const [ghostCells,   setGhostCells]   = useState([]);
   const [clearedCells, setClearedCells] = useState([]);
   const [scoreAnims,   setScoreAnims]   = useState([]);
   const [comboInfo,    setComboInfo]    = useState(null);
@@ -196,12 +201,24 @@ export default function GameScreen({ onBack }) {
   const comboRef       = useRef(combo);
   const scoreRef       = useRef(score);
   const dragPan        = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-  const lastGhost      = useRef({ row: -1, col: -1 });
 
   boardState.current  = board;
   piecesState.current = pieces;
   comboRef.current    = combo;
   scoreRef.current    = score;
+
+  // Restore the high score saved on a previous app session. `globalBestScore`
+  // only survives while the JS engine stays alive; a full app close/reopen
+  // reset it to 0, which is what was reported — so read the persisted value
+  // once on mount and adopt it if it's ahead of what we have in memory.
+  useEffect(() => {
+    loadNumber(STORAGE_KEYS.BLOCKBLAST_BEST_SCORE, 0).then((saved) => {
+      if (saved > globalBestScore) {
+        globalBestScore = saved;
+        setBestScore(saved);
+      }
+    });
+  }, []);
 
   const measureBoard = useCallback(() => {
     requestAnimationFrame(() => {
@@ -223,42 +240,21 @@ export default function GameScreen({ onBack }) {
     return { row, col };
   }, []);
 
-  const calcGhost = useCallback((px, py, piece, board) => {
-    const { row, col } = getBoardCell(px, py, piece.shape);
-    if (!canPlacePiece(board, piece.shape, row, col)) return [];
-    const cells = [];
-    for (let r = 0; r < piece.shape.length; r++)
-      for (let c = 0; c < piece.shape[r].length; c++)
-        if (piece.shape[r][c]) cells.push({ r: row + r, c: col + c });
-    return cells;
-  }, [getBoardCell]);
-
   const handleDragStart = useCallback((idx, px, py) => {
     const piece = piecesState.current[idx];
     if (!piece) return;
     playTap();
     dragPan.setValue({ x: px, y: py });
     setDragging({ pieceIdx: idx, piece });
-
-    lastGhost.current = { row: -1, col: -1 };
-    setGhostCells(calcGhost(px, py, piece, boardState.current));
-  }, [calcGhost, dragPan]);
+  }, [dragPan]);
 
   const handleDragMove = useCallback((idx, px, py) => {
     const piece = piecesState.current[idx];
     if (!piece) return;
     dragPan.setValue({ x: px, y: py });
-
-    // Only update ghost cells if the grid position changed
-    const { row, col } = getBoardCell(px, py, piece.shape);
-    if (lastGhost.current.row !== row || lastGhost.current.col !== col) {
-      lastGhost.current = { row, col };
-      setGhostCells(calcGhost(px, py, piece, boardState.current));
-    }
-  }, [calcGhost, getBoardCell, dragPan]);
+  }, [dragPan]);
 
   const handleDragEnd = useCallback((idx, px, py) => {
-    setGhostCells([]);
     setDragging(null);
     const dragPiece = piecesState.current[idx];
     if (!dragPiece || px < 0) return;
@@ -276,7 +272,11 @@ export default function GameScreen({ onBack }) {
     const newScore  = scoreRef.current + gained;
 
     setScore(newScore);
-    setBestScore(prev => Math.max(prev, newScore));
+    if (newScore > globalBestScore) {
+      globalBestScore = newScore;
+      setBestScore(newScore);
+      saveNumber(STORAGE_KEYS.BLOCKBLAST_BEST_SCORE, newScore);
+    }
     setCombo(newCombo);
     setBoard(newBoard);
     boardState.current = newBoard;
@@ -336,7 +336,7 @@ export default function GameScreen({ onBack }) {
     setBoard(b); boardState.current = b;
     setPieces(p); piecesState.current = p;
     setScore(0); setCombo(0);
-    setGhostCells([]); setClearedCells([]);
+    setClearedCells([]);
     setScoreAnims([]); setComboInfo(null);
     setIsGameOver(false); setDragging(null);
   }, []);
@@ -357,24 +357,20 @@ export default function GameScreen({ onBack }) {
 
   return (
     <View style={styles.root} ref={containerRef} onLayout={measureBoard} collapsable={false}>
-      <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
+      <StatusBar backgroundColor="transparent" barStyle="dark-content" translucent />
 
-      {/* ── Neon Arcade backdrop: near-black with glowing corner blobs ── */}
+      {/* ── Bright cartoon backdrop: warm sunlit gradient with soft blobs ── */}
       <LinearGradient
-        colors={['#14142E', '#0B0B1A', '#05050F']}
+        colors={[THEME.bgTop, THEME.bgMid, THEME.bgBottom]}
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.glowBlobCyan} />
       <View style={styles.glowBlobMagenta} />
 
-      {/* Subtle top vignette for depth */}
-      <View style={styles.topVignette} />
-
       {/* ── Header ── */}
       <GameHeader
         title="Block Blast"
         subtitle={`BEST: ${bestScore.toLocaleString()}`}
-        accent="#FFD700"
         onBack={onBack}
         liked={liked}
         onLike={() => setLiked(l => !l)}
@@ -407,7 +403,6 @@ export default function GameScreen({ onBack }) {
               highlightCells={clearedCells}
               cellSize={CELL_SIZE}
             />
-            <GhostLayer ghostCells={ghostCells} cellSize={CELL_SIZE} dragKey={dragging} />
           </View>
         </View>
         <Animated.View
@@ -457,12 +452,6 @@ export default function GameScreen({ onBack }) {
           <Animated.View style={{
             position: 'absolute',
             transform: getOverlayTransform(),
-            // Floating shadow glow
-            elevation: 24,
-            shadowColor: NEON.cyan,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.85,
-            shadowRadius: 20,
           }}>
             <PieceView piece={dragging.piece} cellSize={CELL_SIZE} />
           </Animated.View>
@@ -485,32 +474,27 @@ export default function GameScreen({ onBack }) {
 const styles = StyleSheet.create({
   root: { flex: 1, alignItems: 'center' },
 
-  topVignette: {
-    position: 'absolute', top: 0, left: 0, right: 0,
-    height: 220,
-    backgroundColor: 'rgba(0,0,0,0.18)',
-  },
   glowBlobCyan: {
     position: 'absolute', top: -80, left: -80,
     width: 220, height: 220, borderRadius: 110,
-    backgroundColor: NEON.cyan, opacity: 0.10,
+    backgroundColor: THEME.gold, opacity: 0.20,
   },
   glowBlobMagenta: {
     position: 'absolute', top: 120, right: -100,
     width: 260, height: 260, borderRadius: 130,
-    backgroundColor: NEON.magenta, opacity: 0.08,
+    backgroundColor: THEME.coral, opacity: 0.14,
   },
 
   // ── Big score ──
   bigScore: {
-    color: '#FFFFFF',
+    color: THEME.textPrimary,
     fontSize: 52,
     fontWeight: '900',
     letterSpacing: -1,
     marginBottom: 4,
-    textShadowColor: NEON.cyan,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 14,
+    textShadowColor: 'rgba(255,255,255,0.8)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 0,
   },
 
   // ── Combo banner ──
@@ -520,34 +504,30 @@ const styles = StyleSheet.create({
   comboPill: {
     flexDirection: 'row', alignItems: 'center',
     borderRadius: 24, paddingHorizontal: 28, paddingVertical: 8, gap: 10,
-    backgroundColor: NEON.glassFill,
-    borderWidth: 1.5,
-    borderColor: NEON.magenta,
-    elevation: 8,
-    shadowColor: NEON.magenta, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 12,
+    backgroundColor: THEME.coral,
+    borderWidth: 2.5,
+    borderColor: '#B0295A',
+    ...cartoonShadow('#000', 6, 0.25),
   },
   comboLabel: { color: '#FFFFFF', fontSize: 20, fontWeight: '900', letterSpacing: 0.5 },
-  comboCount: { color: NEON.cyan, fontSize: 24, fontWeight: '900', letterSpacing: -0.5,
-    textShadowColor: NEON.cyan, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 },
+  comboCount: { color: '#FFF3B0', fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
 
   // ── Board ──
   boardOuter: {
-    elevation: 20,
-    shadowColor: NEON.cyan,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 22,
+    ...cartoonShadow('#000', 10, 0.22),
     position: 'relative',
   },
   boardShadow: {
-    borderRadius: 18,
+    // No border here — Board.js already draws its own gold border. A
+    // second border on this wrapper (the old borderWidth/borderColor)
+    // combined with the sizing bug just fixed in Board.js was what made
+    // the frame look like two mismatched, overlapping borders.
+    borderRadius: 22,
     overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: NEON.cyanDim,
   },
   flashOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    borderRadius: 18, backgroundColor: NEON.cyan,
+    borderRadius: 22, backgroundColor: THEME.gold,
   },
 
   // ── Tray ──
@@ -561,21 +541,22 @@ const styles = StyleSheet.create({
   },
   trayCard: {
     width: '100%',
-    backgroundColor: NEON.glassFill,
+    backgroundColor: THEME.panel,
     borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: NEON.violetDim,
+    borderWidth: 3,
+    borderColor: THEME.panelBorder,
     paddingTop: 6,
     paddingBottom: 12,
     paddingHorizontal: 6,
     overflow: 'hidden',
+    ...cartoonShadow('#000', 6, 0.15),
   },
   trayShine: {
     position: 'absolute',
     top: 0, left: 20, right: 20,
-    height: 1.5,
-    backgroundColor: NEON.violet,
-    opacity: 0.4,
+    height: 2,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.6,
     borderRadius: 1,
   },
   piecesRow: {
@@ -592,9 +573,9 @@ const styles = StyleSheet.create({
   emptySlot: {
     width: 56, height: 56,
     borderRadius: 14,
-    backgroundColor: 'rgba(139,44,255,0.06)',
+    backgroundColor: THEME.cellBg,
     borderWidth: 1.5,
-    borderColor: NEON.violetDim,
+    borderColor: THEME.panelBorder,
   },
 
   // ── Drag overlay ──

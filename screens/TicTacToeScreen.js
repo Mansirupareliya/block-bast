@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { checkWinner, getBestMove } from '../utils/tictactoeAI';
-import { playClick, playTap, playSuccess } from '../utils/audioManager';
+import { playTap, playMark, playTicTacToeWin } from '../utils/audioManager';
 
 const { width: SW } = Dimensions.get('window');
 const BOARD_W = SW - 64;
@@ -58,13 +58,13 @@ export default function TicTacToeScreen({ onBack }) {
       const move = getBestMove(copy, 'medium');
       if (move === -1) { setThinking(false); return; }
       copy[move] = 'O';
-      playClick();
+      playMark();
       animateCell(move);
       setBoard(copy);
       setThinking(false);
       const res = checkWinner(copy);
       if (res) { 
-        if (res.winner !== 'draw') playSuccess();
+        if (res.winner !== 'draw') playTicTacToeWin();
         applyResult(res, currentScores); 
       }
       else     { setIsXTurn(true); }
@@ -81,13 +81,13 @@ export default function TicTacToeScreen({ onBack }) {
     const copy = [...board];
     const mark = isXTurn ? 'X' : 'O';
     copy[idx] = mark;
-    playClick();
+    playMark();
     animateCell(idx);
     setBoard(copy);
     
     const res = checkWinner(copy);
     if (res) { 
-      if (res.winner !== 'draw') playSuccess();
+      if (res.winner !== 'draw') playTicTacToeWin();
       applyResult(res, scores); 
     } else { 
       const nextTurn = !isXTurn;

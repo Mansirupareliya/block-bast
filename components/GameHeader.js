@@ -3,15 +3,43 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   Platform, StatusBar, Animated,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { playTap } from '../utils/audioManager';
-import { NEON } from '../utils/theme';
+import { THEME, cartoonShadow } from '../utils/blockBlastTheme';
 
 // Status bar height — computed once at module level
 const STATUS_H = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 44;
 
+// ── Glossy cartoon bubble button — same recipe as the Matchmaker game's
+// CartoonButton (bold border, light-top/dark-bottom gradient face, a
+// diagonal glossy highlight blob) so both games share one button language.
+function CartoonButton({ size = 40, onPress, children, style }) {
+  const borderW = Math.max(2.5, size * 0.07);
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.75} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={style}>
+      <LinearGradient
+        colors={['#FFE27A', '#FFC93C', '#B9782E']}
+        style={{
+          width: size, height: size, borderRadius: size / 2,
+          borderWidth: borderW, borderColor: THEME.brown,
+          alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+          ...cartoonShadow('#000', 4, 0.28),
+        }}
+      >
+        <View style={{
+          position: 'absolute', top: size * 0.1, left: size * 0.12,
+          width: size * 0.38, height: size * 0.22, borderRadius: size * 0.18,
+          backgroundColor: 'rgba(255,255,255,0.55)', transform: [{ rotate: '-18deg' }],
+        }} />
+        {children}
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+}
+
 /**
- * Game header matching reference image:
- *   👑 2299         ♡
+ * Game header — bright cartoon style:
+ *   (‹ back)      👑 2299       (♡ like)
  *
  * Props:
  *   subtitle   — best score number
@@ -21,8 +49,7 @@ const STATUS_H = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 4
  *   headerAnim — optional Animated style
  */
 export default function GameHeader({
-  title, subtitle, accent = '#FFD700',
-  onBack, liked = false, onLike,
+  title, subtitle, onBack, liked = false, onLike,
   headerAnim,
 }) {
   const likeScale = React.useRef(new Animated.Value(1)).current;
@@ -51,39 +78,29 @@ export default function GameHeader({
 
       <View style={styles.row}>
 
-        {/* LEFT — Back button (‹ chevron bare) */}
-        <TouchableOpacity
-          onPress={handleBack}
-          activeOpacity={0.5}
-          style={styles.leftSlot}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
+        {/* LEFT — Back button */}
+        <CartoonButton size={40} onPress={handleBack}>
           <Text style={styles.chevron}>{'‹'}</Text>
-        </TouchableOpacity>
+        </CartoonButton>
 
-        {/* CENTER — Crown + best score */}
+        {/* CENTER — Crown + best score pill */}
         <View style={styles.center}>
-          <Text style={styles.crownIcon}>👑</Text>
-          <Text style={styles.bestScore}>{bestNum}</Text>
+          <View style={styles.scorePill}>
+            <Text style={styles.crownIcon}>👑</Text>
+            <Text style={styles.bestScore}>{bestNum}</Text>
+          </View>
         </View>
 
         {/* RIGHT — Heart like button */}
-        <View style={styles.rightSlot}>
-          <TouchableOpacity
-            onPress={handleLike}
-            activeOpacity={0.5}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <Animated.Text style={[
-              styles.heartIcon,
-              { color: liked ? NEON.magenta : 'rgba(255,255,255,0.4)' },
-              liked && { textShadowColor: NEON.magenta, textShadowRadius: 10, textShadowOffset: { width: 0, height: 0 } },
-              { transform: [{ scale: likeScale }] },
-            ]}>
-              {liked ? '♥' : '♡'}
-            </Animated.Text>
-          </TouchableOpacity>
-        </View>
+        <CartoonButton size={40} onPress={handleLike}>
+          <Animated.Text style={[
+            styles.heartIcon,
+            { color: liked ? '#FFFFFF' : 'rgba(122,74,24,0.55)' },
+            { transform: [{ scale: likeScale }] },
+          ]}>
+            {liked ? '♥' : '♡'}
+          </Animated.Text>
+        </CartoonButton>
 
       </View>
     </Animated.View>
@@ -101,60 +118,49 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 18,
     paddingVertical: 6,
   },
 
-  // Left slot — back chevron
-  leftSlot: {
-    width: 40,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
   chevron: {
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: '200',
-    color: NEON.cyan,
-    textShadowColor: NEON.cyan,
-    textShadowRadius: 10,
-    textShadowOffset: { width: 0, height: 0 },
-    marginTop: -3,
+    fontSize: 26,
+    lineHeight: 28,
+    fontWeight: '900',
+    color: THEME.brown,
+    marginTop: -2,
   },
 
-  // Center — crown + score
+  // Center — crown + score pill
   center: {
     flex: 1,
+    alignItems: 'center',
+  },
+  scorePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 6,
+    backgroundColor: THEME.panel,
+    borderWidth: 2,
+    borderColor: THEME.panelBorder,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    ...cartoonShadow('#000', 4, 0.15),
   },
   crownIcon: {
+    fontSize: 18,
+    lineHeight: 22,
+  },
+  bestScore: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: THEME.textPrimary,
+    letterSpacing: 0.5,
+  },
+
+  heartIcon: {
     fontSize: 20,
     lineHeight: 24,
   },
-  bestScore: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: NEON.gold,
-    letterSpacing: 0.5,
-    textShadowColor: NEON.gold,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
-  },
-
-  // Right slot — heart like button
-  rightSlot: {
-    width: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  heartIcon: {
-    fontSize: 22,
-    lineHeight: 26,
-  },
 });
-
-

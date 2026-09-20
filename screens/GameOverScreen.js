@@ -1,10 +1,56 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { playTap, playSuccess } from '../utils/audioManager';
-import { NEON } from '../utils/theme';
+import { THEME } from '../utils/blockBlastTheme';
 
 const { width: SW } = Dimensions.get('window');
+
+// ── Confetti burst (new-record celebration) ───────────────────────────────
+// A handful of small colored chips flying outward from the center and
+// fading as they go — fires once on mount, purely Animated/Views (no
+// image assets or a particle library).
+const CONFETTI_COLORS = [THEME.sky, THEME.coral, THEME.gold, '#7FD858', '#B685E8'];
+
+function ConfettiPiece({ angle, dist, delay, color, shape }) {
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(t, {
+      toValue: 1, duration: 900, delay, easing: Easing.out(Easing.quad), useNativeDriver: true,
+    }).start();
+  }, []);
+  const dx = Math.cos(angle) * dist;
+  const dy = Math.sin(angle) * dist;
+  const translateX = t.interpolate({ inputRange: [0, 1], outputRange: [0, dx] });
+  const translateY = t.interpolate({ inputRange: [0, 1], outputRange: [0, dy] });
+  const opacity = t.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 1, 0] });
+  const rotate = t.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${360 + (angle * 180) / Math.PI}deg`] });
+  return (
+    <Animated.View style={{
+      position: 'absolute', top: '50%', left: '50%',
+      width: 8, height: 8, borderRadius: shape === 'circle' ? 4 : 2,
+      backgroundColor: color, opacity,
+      transform: [{ translateX }, { translateY }, { rotate }],
+    }} />
+  );
+}
+
+function Confetti({ count = 20 }) {
+  const pieces = useRef(
+    Array.from({ length: count }, (_, i) => ({
+      angle: (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5,
+      dist: 90 + Math.random() * 60,
+      delay: Math.random() * 150,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      shape: i % 2 === 0 ? 'circle' : 'square',
+    }))
+  ).current;
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {pieces.map((p, i) => <ConfettiPiece key={i} {...p} />)}
+    </View>
+  );
+}
 
 // View-drawn star for Game Over rating
 function Star({ anim, filled, size = 48 }) {
@@ -20,16 +66,16 @@ function Star({ anim, filled, size = 48 }) {
       <View style={[{
         width: s * 0.78, height: s * 0.78,
         borderRadius: s * 0.39,
-        backgroundColor: filled ? '#FFD700' : 'rgba(255,255,255,0.12)',
+        backgroundColor: filled ? '#FFD700' : 'rgba(122,74,24,0.10)',
         borderWidth: 2,
-        borderColor: filled ? '#FFAA00' : 'rgba(255,255,255,0.2)',
+        borderColor: filled ? '#FFAA00' : 'rgba(122,74,24,0.18)',
         alignItems: 'center', justifyContent: 'center',
       }]}>
         {/* Inner gem shape */}
         <View style={{
           width: s * 0.36, height: s * 0.36,
           transform: [{ rotate: '45deg' }],
-          backgroundColor: filled ? '#FFFAAA' : 'rgba(255,255,255,0.08)',
+          backgroundColor: filled ? '#FFFAAA' : 'rgba(122,74,24,0.08)',
           borderRadius: s * 0.05,
         }} />
         {/* Shine on filled star */}
@@ -49,6 +95,7 @@ function Star({ anim, filled, size = 48 }) {
 export default function GameOverScreen({ score, bestScore, onRestart, onBack }) {
   const cardScale   = useRef(new Animated.Value(0.4)).current;
   const cardOpacity = useRef(new Animated.Value(0)).current;
+  const cardRotate  = useRef(new Animated.Value(1)).current; // 1 = flipped away, 0 = flat-on
   const overlayOp   = useRef(new Animated.Value(0)).current;
   const starScales  = [
     useRef(new Animated.Value(0)).current,
@@ -70,6 +117,7 @@ export default function GameOverScreen({ score, bestScore, onRestart, onBack }) 
       Animated.sequence([
         Animated.parallel([
           Animated.spring(cardScale,   { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }),
+          Animated.spring(cardRotate,  { toValue: 0, friction: 7, tension: 60, useNativeDriver: true }),
           Animated.timing(cardOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
         ]),
         Animated.stagger(130, starScales.map((s, i) =>
@@ -91,13 +139,18 @@ export default function GameOverScreen({ score, bestScore, onRestart, onBack }) 
   const onPressOut = () => Animated.spring(btnScale, { toValue: 1,    useNativeDriver: true }).start();
 
   const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] });
+  const cardRotateY = cardRotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '70deg'] });
 
   return (
     <Animated.View style={[styles.overlay, { opacity: overlayOp }]}>
-      <Animated.View style={[styles.card, { opacity: cardOpacity, transform: [{ scale: cardScale }] }]}>
-        {/* Dark glass background */}
+      {isNewRecord && <Confetti />}
+      <Animated.View style={[styles.card, {
+        opacity: cardOpacity,
+        transform: [{ perspective: 900 }, { rotateY: cardRotateY }, { scale: cardScale }],
+      }]}>
+        {/* Warm cream card background */}
         <LinearGradient
-          colors={['#1A1440', '#0B0B1A', '#05050F']}
+          colors={['#FFF6E4', '#F5E6D3']}
           style={styles.gradient}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         >
@@ -109,7 +162,7 @@ export default function GameOverScreen({ score, bestScore, onRestart, onBack }) 
           {isNewRecord ? (
             <View style={styles.newRecordWrap}>
               <LinearGradient
-                colors={[NEON.magenta, NEON.violet]}
+                colors={[THEME.coral, THEME.gold]}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={styles.newRecordBadge}
               >
@@ -144,7 +197,7 @@ export default function GameOverScreen({ score, bestScore, onRestart, onBack }) 
           {/* Best score row */}
           <View style={styles.bestRow}>
             <LinearGradient
-              colors={['rgba(255,215,0,0.2)', 'rgba(255,215,0,0.1)']}
+              colors={['rgba(255,201,60,0.35)', 'rgba(255,201,60,0.18)']}
               style={styles.bestPill}
             >
               <View style={styles.bestCrownWrap}>
@@ -171,7 +224,7 @@ export default function GameOverScreen({ score, bestScore, onRestart, onBack }) 
               activeOpacity={1}
             >
               <LinearGradient
-                colors={[NEON.cyan, NEON.violet, NEON.magenta]}
+                colors={['#7FD858', '#4FAF4F', '#2E7D32']}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={styles.btn}
               >
@@ -196,52 +249,50 @@ export default function GameOverScreen({ score, bestScore, onRestart, onBack }) 
 const styles = StyleSheet.create({
   overlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.72)',
+    backgroundColor: 'rgba(58,28,10,0.6)',
     alignItems: 'center', justifyContent: 'center',
     zIndex: 10000,
   },
   card: {
     width: SW * 0.84,
     borderRadius: 28, overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: NEON.violetDim,
+    borderWidth: 3,
+    borderColor: 'rgba(122,74,24,0.25)',
     elevation: 30,
-    shadowColor: NEON.violet,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5, shadowRadius: 26,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35, shadowRadius: 20,
   },
   gradient: { padding: 28, alignItems: 'center', overflow: 'hidden' },
 
   blobTL: {
     position: 'absolute', top: -50, left: -50,
     width: 150, height: 150, borderRadius: 75,
-    backgroundColor: NEON.cyan, opacity: 0.10,
+    backgroundColor: THEME.gold, opacity: 0.18,
   },
   blobBR: {
     position: 'absolute', bottom: -40, right: -40,
     width: 120, height: 120, borderRadius: 60,
-    backgroundColor: NEON.magenta, opacity: 0.10,
+    backgroundColor: THEME.coral, opacity: 0.14,
   },
 
   newRecordWrap: { marginBottom: 14 },
   newRecordBadge: {
     borderRadius: 16, paddingHorizontal: 20, paddingVertical: 8,
+    borderWidth: 2, borderColor: THEME.brown,
     elevation: 8,
-    shadowColor: NEON.magenta, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6,
   },
   newRecordText: { color: '#FFFFFF', fontSize: 20, fontWeight: '900', letterSpacing: 2 },
 
   title: {
-    color: '#FFFFFF', fontSize: 28, fontWeight: '900', letterSpacing: 4,
+    color: THEME.textPrimary, fontSize: 28, fontWeight: '900', letterSpacing: 4,
     marginBottom: 14,
-    textShadowColor: NEON.cyan,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 12,
   },
 
   starsRow: { flexDirection: 'row', marginBottom: 20, alignItems: 'center' },
 
-  scoreLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700', letterSpacing: 2.5, marginBottom: 8 },
+  scoreLabel: { color: THEME.textDim, fontSize: 11, fontWeight: '700', letterSpacing: 2.5, marginBottom: 8 },
   scoreGlow: {
     borderRadius: 18, marginBottom: 16,
     shadowColor: '#FFD700', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 16,
@@ -250,6 +301,12 @@ const styles = StyleSheet.create({
   scorePill: {
     borderRadius: 18, paddingHorizontal: 36, paddingVertical: 12,
     minWidth: 150, alignItems: 'center', overflow: 'hidden',
+    // Beveled edge — light top/left, dark bottom/right — the same "3D
+    // block" language as the game's own gem tiles (GemCell.js), so the
+    // score reads as one more block rather than a generic pill.
+    borderWidth: 4,
+    borderTopColor: 'rgba(255,255,255,0.5)', borderLeftColor: 'rgba(255,255,255,0.5)',
+    borderBottomColor: 'rgba(0,0,0,0.35)', borderRightColor: 'rgba(0,0,0,0.35)',
   },
   scorePillShine: {
     position: 'absolute', top: 0, left: 0, right: 0,
@@ -266,7 +323,7 @@ const styles = StyleSheet.create({
   bestPill: {
     flexDirection: 'row', alignItems: 'center',
     borderRadius: 12, paddingHorizontal: 16, paddingVertical: 8,
-    borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)',
+    borderWidth: 1.5, borderColor: 'rgba(184,114,46,0.35)',
     gap: 8,
   },
   bestCrownWrap: { width: 16, height: 14, position: 'relative' },
@@ -292,20 +349,21 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3, borderRightWidth: 3, borderBottomWidth: 6,
     borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#FFD700',
   },
-  bestLabel: { color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: '700', letterSpacing: 1 },
-  bestValue: { color: '#FFD700', fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },
+  bestLabel: { color: THEME.textDim, fontSize: 13, fontWeight: '700', letterSpacing: 1 },
+  bestValue: { color: THEME.goldDeep, fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },
 
   divider: {
     width: '80%', height: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(122,74,24,0.15)',
     marginBottom: 20,
   },
 
   btn: {
     borderRadius: 32, paddingVertical: 16,
     alignItems: 'center',
+    borderWidth: 3, borderColor: '#1E5A20',
     elevation: 10,
-    shadowColor: NEON.cyan, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8,
     overflow: 'hidden',
   },
   btnShine: {
@@ -319,5 +377,5 @@ const styles = StyleSheet.create({
   },
 
   homeBtn: { marginTop: 14, paddingVertical: 4 },
-  homeBtnText: { color: 'rgba(255,255,255,0.35)', fontSize: 13, letterSpacing: 0.5 },
+  homeBtnText: { color: THEME.textFaint, fontSize: 13, letterSpacing: 0.5 },
 });

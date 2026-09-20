@@ -1,10 +1,11 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Dimensions, StatusBar, ScrollView,
   PanResponder, Animated, Image
 } from 'react-native';
 import { playTap, playClick, playSuccess } from '../utils/audioManager';
+import { STORAGE_KEYS, loadNumber, saveNumber } from '../utils/storage';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -238,6 +239,19 @@ export default function DogsBlocksScreen({ onBack }) {
   const boardLayout = useRef(null);
   const boardRef    = useRef(null);
 
+  // Restore progress saved on a previous app session. `globalUnlocked` only
+  // survives while the JS engine stays alive (screen navigations within one
+  // session); a full app close/reopen resets it, which is what was reported
+  // — so read the persisted value once on mount and adopt it if it's ahead.
+  useEffect(() => {
+    loadNumber(STORAGE_KEYS.DOGSBLOCKS_MAX_UNLOCKED, 1).then((saved) => {
+      if (saved > globalUnlocked) {
+        globalUnlocked = saved;
+        setMaxUnlocked(saved);
+      }
+    });
+  }, []);
+
   const lvl = LEVEL_DATA[levelIdx] || LEVEL_DATA[0];
   const { gridSize, pieces, emptyCells } = lvl;
 
@@ -296,6 +310,7 @@ export default function DogsBlocksScreen({ onBack }) {
       const next = Math.max(maxUnlocked, levelIdx + 2);
       setMaxUnlocked(next);
       globalUnlocked = next;
+      saveNumber(STORAGE_KEYS.DOGSBLOCKS_MAX_UNLOCKED, next);
     }
     return true;
   }, [pieces, placed, emptyCells, isPiecePlaced, isCellFilled, levelIdx, maxUnlocked]);
