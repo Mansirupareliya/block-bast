@@ -15,6 +15,9 @@ import {
   playClick, playTap, playSuccess, playFail,
 } from '../utils/audioManager';
 import { STORAGE_KEYS, loadNumber, saveNumber } from '../utils/storage';
+import { getPlayerName } from '../utils/playerIdentity';
+import { submitProgress } from '../utils/leaderboardService';
+import LeaderboardScreen from './LeaderboardScreen';
 import {
   BOARD_SIZE, createEmptyBoard, getRandomPieces,
   canPlacePiece, placePiece, clearLines,
@@ -175,6 +178,7 @@ function PauseIcon({ size = 16 }) {
 let globalBestScore = 0;
 
 export default function GameScreen({ onBack }) {
+  const [view,          setView]        = useState('game'); // 'game' | 'leaderboard'
   const [board,        setBoard]        = useState(createEmptyBoard);
   const [pieces,       setPieces]       = useState(() => getRandomPieces(3));
   const [score,        setScore]        = useState(0);
@@ -207,6 +211,17 @@ export default function GameScreen({ onBack }) {
   comboRef.current    = combo;
   scoreRef.current    = score;
 
+  // Pushes this player's current name + high score to the shared
+  // leaderboard. Fire-and-forget: a leaderboard that isn't configured yet,
+  // or a flaky connection, should never interrupt gameplay.
+  const syncLeaderboardProgress = useCallback(() => {
+    getPlayerName().then((name) => {
+      submitProgress('blockblastLeaderboard', { name, bestScore: globalBestScore }).catch((error) => {
+        console.log('Leaderboard sync skipped:', error.message);
+      });
+    });
+  }, []);
+
   // Restore the high score saved on a previous app session. `globalBestScore`
   // only survives while the JS engine stays alive; a full app close/reopen
   // reset it to 0, which is what was reported — so read the persisted value
@@ -217,8 +232,9 @@ export default function GameScreen({ onBack }) {
         globalBestScore = saved;
         setBestScore(saved);
       }
+      syncLeaderboardProgress();
     });
-  }, []);
+  }, [syncLeaderboardProgress]);
 
   const measureBoard = useCallback(() => {
     requestAnimationFrame(() => {
@@ -276,6 +292,7 @@ export default function GameScreen({ onBack }) {
       globalBestScore = newScore;
       setBestScore(newScore);
       saveNumber(STORAGE_KEYS.BLOCKBLAST_BEST_SCORE, newScore);
+      syncLeaderboardProgress();
     }
     setCombo(newCombo);
     setBoard(newBoard);
@@ -329,7 +346,7 @@ export default function GameScreen({ onBack }) {
       playFail();
       setTimeout(() => setIsGameOver(true), 500);
     }
-  }, [getBoardCell]);
+  }, [getBoardCell, syncLeaderboardProgress]);
 
   const handleRestart = useCallback(() => {
     const b = createEmptyBoard(), p = getRandomPieces(3);
@@ -355,6 +372,18 @@ export default function GameScreen({ onBack }) {
 
   const boardGlowOp = boardFlash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.85] });
 
+  if (view === 'leaderboard') {
+    return (
+      <LeaderboardScreen
+        onBack={() => setView('game')}
+        collectionName="blockblastLeaderboard"
+        sortFields={['bestScore']}
+        title="High Scores"
+        showStage={false}
+      />
+    );
+  }
+
   return (
     <View style={styles.root} ref={containerRef} onLayout={measureBoard} collapsable={false}>
       <StatusBar backgroundColor="transparent" barStyle="dark-content" translucent />
@@ -374,6 +403,7 @@ export default function GameScreen({ onBack }) {
         onBack={onBack}
         liked={liked}
         onLike={() => setLiked(l => !l)}
+        onLeaderboard={() => setView('leaderboard')}
       />
 
       {/* ── Current score large display ── */}

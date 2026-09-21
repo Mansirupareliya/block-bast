@@ -285,6 +285,15 @@ export default function HomeScreen({ onSelect }) {
           <Animated.Text style={[styles.brandTitle, { textShadowRadius: titleGlowRadius }]}>
             GAME<Text style={styles.brandTitleAccent}> HUB</Text>
           </Animated.Text>
+
+          <TouchableOpacity
+            onPress={() => { playTap(); onSelect('settings'); }}
+            style={styles.settingsBtn}
+            activeOpacity={0.8}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={styles.settingsIcon}>⚙️</Text>
+          </TouchableOpacity>
         </View>
 
         {/* ── Tab bar: All Games / Favorites ── */}
@@ -374,12 +383,19 @@ const styles = StyleSheet.create({
   },
 
   // ── App wordmark ──
-  brandRow: { marginBottom: 16, alignItems: 'center' },
+  brandRow: { marginBottom: 16, alignItems: 'center', justifyContent: 'center' },
   brandTitle: {
     fontSize: 28, fontWeight: '900', letterSpacing: 2, color: '#FFFFFF',
     textShadowColor: NEON.cyan, textShadowOffset: { width: 0, height: 0 },
   },
   brandTitleAccent: { color: NEON.magenta },
+  settingsBtn: {
+    position: 'absolute', right: 0, top: 2,
+    width: 34, height: 34, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: NEON.glassFill, borderWidth: 1, borderColor: NEON.glassBorder,
+  },
+  settingsIcon: { fontSize: 16 },
 
   // ── Tab bar ──
   tabBar: {

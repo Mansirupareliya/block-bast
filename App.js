@@ -7,6 +7,7 @@ import TicTacToeScreen   from './screens/TicTacToeScreen';
 import MemoryMatchScreen from './screens/MemoryMatchScreen';
 import DogsBlocksScreen  from './screens/DogsBlocksScreen';
 import BoxPusherScreen   from './screens/BoxPusherScreen';
+import SettingsScreen    from './screens/SettingsScreen';
 
 export default function App() {
   const [screen, setScreen] = useState('home');
@@ -19,6 +20,7 @@ export default function App() {
       {screen === 'memorymatch' && <MemoryMatchScreen  onBack={() => setScreen('home')} />}
       {screen === 'dogsblocks'  && <DogsBlocksScreen   onBack={() => setScreen('home')} />}
       {screen === 'boxpusher'   && <BoxPusherScreen    onBack={() => setScreen('home')} />}
+      {screen === 'settings'    && <SettingsScreen     onBack={() => setScreen('home')} />}
     </GestureHandlerRootView>
   );
 }

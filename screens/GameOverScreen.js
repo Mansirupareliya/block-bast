@@ -158,6 +158,8 @@ export default function GameOverScreen({ score, bestScore, onRestart, onBack }) 
           <View style={styles.blobTL} />
           <View style={styles.blobBR} />
 
+          <Text style={styles.trophyModel}>🏆</Text>
+
           {/* Title */}
           {isNewRecord ? (
             <View style={styles.newRecordWrap}>
@@ -264,6 +266,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35, shadowRadius: 20,
   },
   gradient: { padding: 28, alignItems: 'center', overflow: 'hidden' },
+
+  trophyModel: { fontSize: 90, marginBottom: 4, textAlign: 'center' },
 
   blobTL: {
     position: 'absolute', top: -50, left: -50,

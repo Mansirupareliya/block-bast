@@ -42,14 +42,16 @@ function CartoonButton({ size = 40, onPress, children, style }) {
  *   (‹ back)      👑 2299       (♡ like)
  *
  * Props:
- *   subtitle   — best score number
- *   onBack     — called when back/settings pressed
- *   liked      — boolean heart state
- *   onLike     — heart toggle
- *   headerAnim — optional Animated style
+ *   subtitle    — best score number
+ *   onBack      — called when back/settings pressed
+ *   liked       — boolean heart state
+ *   onLike      — heart toggle
+ *   onLeaderboard — optional; when given, the trophy/score pill becomes
+ *                   tappable and opens the leaderboard
+ *   headerAnim  — optional Animated style
  */
 export default function GameHeader({
-  title, subtitle, onBack, liked = false, onLike,
+  title, subtitle, onBack, liked = false, onLike, onLeaderboard,
   headerAnim,
 }) {
   const likeScale = React.useRef(new Animated.Value(1)).current;
@@ -83,12 +85,17 @@ export default function GameHeader({
           <Text style={styles.chevron}>{'‹'}</Text>
         </CartoonButton>
 
-        {/* CENTER — Crown + best score pill */}
+        {/* CENTER — Trophy + best score pill (opens the leaderboard, if wired up) */}
         <View style={styles.center}>
-          <View style={styles.scorePill}>
-            <Text style={styles.crownIcon}>👑</Text>
+          <TouchableOpacity
+            style={styles.scorePill}
+            activeOpacity={onLeaderboard ? 0.75 : 1}
+            disabled={!onLeaderboard}
+            onPress={() => { playTap(); onLeaderboard?.(); }}
+          >
+            <Text style={[styles.crownIcon, { fontSize: 18 }]}>🏆</Text>
             <Text style={styles.bestScore}>{bestNum}</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* RIGHT — Heart like button */}
@@ -149,8 +156,7 @@ const styles = StyleSheet.create({
     ...cartoonShadow('#000', 4, 0.15),
   },
   crownIcon: {
-    fontSize: 18,
-    lineHeight: 22,
+    marginRight: -2,
   },
   bestScore: {
     fontSize: 18,

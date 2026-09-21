@@ -7,6 +7,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Rect, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { playTap, playFlip, playMatch, playMismatch, playWin, playLocked } from '../utils/audioManager';
 import { STORAGE_KEYS, loadNumber, saveNumber } from '../utils/storage';
+import { getPlayerName } from '../utils/playerIdentity';
+import { submitProgress } from '../utils/leaderboardService';
+import LeaderboardScreen from './LeaderboardScreen';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -420,7 +423,7 @@ let globalBestScore = 0;
 
 // ── Main Screen ───────────────────────────────────────────────────────────
 export default function MatchmakerScreen({ onBack }) {
-  const [view, setView] = useState('start'); // 'start' | 'game' | 'levels'
+  const [view, setView] = useState('start'); // 'start' | 'game' | 'levels' | 'leaderboard'
   const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
   const [maxUnlockedLevel, setMaxUnlockedLevel] = useState(globalUnlockedLevel);
   const [bestScore, setBestScore] = useState(globalBestScore); // arbitrary scoring for UI
@@ -437,25 +440,38 @@ export default function MatchmakerScreen({ onBack }) {
   const cardAnims = useRef([]);
 
 
+  // Pushes this player's current name + stage reached to the shared
+  // leaderboard. Fire-and-forget: a leaderboard that isn't configured yet,
+  // or a flaky connection, should never interrupt gameplay.
+  const syncLeaderboardProgress = useCallback(() => {
+    getPlayerName().then((name) => {
+      submitProgress('matchmakerLeaderboard', { name, maxLevel: globalUnlockedLevel, bestScore: globalBestScore }).catch((error) => {
+        console.log('Leaderboard sync skipped:', error.message);
+      });
+    });
+  }, []);
+
   // Restore progress saved on a previous app session. The `global*` vars
   // above only survive while the JS engine stays alive (screen navigations
   // within one session); a full app close/reopen resets them, which is
   // what was reported — so read the persisted values once on mount and
   // adopt them if they're ahead of what we have in memory.
   useEffect(() => {
-    loadNumber(STORAGE_KEYS.MATCHMAKER_MAX_UNLOCKED, 1).then((saved) => {
-      if (saved > globalUnlockedLevel) {
-        globalUnlockedLevel = saved;
-        setMaxUnlockedLevel(saved);
+    Promise.all([
+      loadNumber(STORAGE_KEYS.MATCHMAKER_MAX_UNLOCKED, 1),
+      loadNumber(STORAGE_KEYS.MATCHMAKER_BEST_SCORE, 0),
+    ]).then(([savedLevel, savedScore]) => {
+      if (savedLevel > globalUnlockedLevel) {
+        globalUnlockedLevel = savedLevel;
+        setMaxUnlockedLevel(savedLevel);
       }
-    });
-    loadNumber(STORAGE_KEYS.MATCHMAKER_BEST_SCORE, 0).then((saved) => {
-      if (saved > globalBestScore) {
-        globalBestScore = saved;
-        setBestScore(saved);
+      if (savedScore > globalBestScore) {
+        globalBestScore = savedScore;
+        setBestScore(savedScore);
       }
+      syncLeaderboardProgress();
     });
-  }, []);
+  }, [syncLeaderboardProgress]);
 
   const cfg = LEVELS[currentLevelIdx] || LEVELS[0];
 
@@ -545,6 +561,8 @@ export default function MatchmakerScreen({ onBack }) {
           setMaxUnlockedLevel(nextLevel);
           globalUnlockedLevel = nextLevel;
           saveNumber(STORAGE_KEYS.MATCHMAKER_MAX_UNLOCKED, nextLevel);
+
+          syncLeaderboardProgress();
         }
         setCanFlip(true);
       } else {
@@ -560,7 +578,7 @@ export default function MatchmakerScreen({ onBack }) {
         });
       }
     }, 600);
-  }, [canFlip, cards, selected, complete, matched, cfg, score, flipAnim, flipBackBoth]);
+  }, [canFlip, cards, selected, complete, matched, cfg, score, flipAnim, flipBackBoth, syncLeaderboardProgress]);
 
   // Briefly reveals every still-hidden card so the player can peek at the
   // board, then flips them all back — a real hint, not just decoration.
@@ -576,6 +594,19 @@ export default function MatchmakerScreen({ onBack }) {
     }, 900);
   }, [hintActive, complete, canFlip]);
 
+  // ── Render Leaderboard Screen ───────────────────────────────────────────
+  if (view === 'leaderboard') {
+    return (
+      <LeaderboardScreen
+        onBack={() => { playTap(); setView('start'); }}
+        collectionName="matchmakerLeaderboard"
+        sortFields={['maxLevel', 'bestScore']}
+        title="Leaderboard"
+        showStage
+      />
+    );
+  }
+
   // ── Render Start Screen ─────────────────────────────────────────────────
   if (view === 'start') {
     return (
@@ -587,9 +618,12 @@ export default function MatchmakerScreen({ onBack }) {
         {/* Large watermark ? — slow breathing pulse */}
         <PulsingWatermark />
 
-        <View style={startStyles.header}>
+        <View style={[startStyles.header, { flexDirection: 'row', justifyContent: 'space-between' }]}>
           <CartoonButton size={44} onPress={() => { playTap(); onBack(); }}>
             <Text style={startStyles.cartoonArrow}>←</Text>
+          </CartoonButton>
+          <CartoonButton size={44} onPress={() => { playTap(); setView('leaderboard'); }}>
+            <Text style={startStyles.cartoonArrow}>🏆</Text>
           </CartoonButton>
         </View>
 
@@ -695,7 +729,7 @@ export default function MatchmakerScreen({ onBack }) {
 
         <View style={gameStyles.hudCol}>
           <View style={gameStyles.levelPill}>
-            <Text style={gameStyles.pillIcon}>👑</Text>
+            <Text style={gameStyles.pillIcon}>🏆</Text>
             <Text style={gameStyles.levelPillTxt}>LEVEL {cfg.level}</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
@@ -713,7 +747,10 @@ export default function MatchmakerScreen({ onBack }) {
 
       <View style={gameStyles.statRow}>
         <View style={gameStyles.statPill}><Text style={gameStyles.statPillTxt}>💎 {score}</Text></View>
-        <View style={gameStyles.statPill}><Text style={gameStyles.statPillTxt}>🏆 {bestScore}</Text></View>
+        <View style={[gameStyles.statPill, gameStyles.statPillRow]}>
+          <Text style={gameStyles.pillIcon}>🏆</Text>
+          <Text style={gameStyles.statPillTxt}>{bestScore}</Text>
+        </View>
       </View>
 
       <View style={gameStyles.boardFrame}>
@@ -886,6 +923,7 @@ const gameStyles = StyleSheet.create({
     backgroundColor: '#FFF6E4', borderWidth: 1.5, borderColor: '#D9BE94',
     borderRadius: 16, paddingVertical: 6, paddingHorizontal: 16,
   },
+  statPillRow: { flexDirection: 'row', alignItems: 'center' },
   statPillTxt: { fontSize: 14, fontWeight: '800', color: '#7A5A38' },
 
   // ── Board frame ──

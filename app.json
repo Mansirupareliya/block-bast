@@ -38,7 +38,8 @@
     },
     "owner": "mansirupareliyas-team",
     "plugins": [
-      "expo-audio"
+      "expo-audio",
+      "expo-asset"
     ]
   }
 }

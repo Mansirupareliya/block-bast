@@ -857,7 +857,12 @@ export default function BoxPusherScreen({ onBack }) {
                     </TouchableOpacity>
                   )}
                 </View>
-                {isLastLevel && <Text style={s.allDoneTxt}>You cleared every level! 🏆</Text>}
+                {isLastLevel && (
+                  <View style={s.allDoneRow}>
+                    <Text style={s.allDoneTxt}>You cleared every level!</Text>
+                    <Text style={{ fontSize: 20 }}>🏆</Text>
+                  </View>
+                )}
               </View>
             </Animated.View>
           </View>
@@ -1049,5 +1054,6 @@ const s = StyleSheet.create({
     borderRadius: 24, paddingVertical: 13, paddingHorizontal: 20,
   },
   pillBtnTxt: { fontSize: 15, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.5 },
-  allDoneTxt: { fontSize: 13, fontWeight: '700', color: '#7A5A38', marginTop: 14, textAlign: 'center' },
+  allDoneRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14 },
+  allDoneTxt: { fontSize: 13, fontWeight: '700', color: '#7A5A38', textAlign: 'center' },
 });

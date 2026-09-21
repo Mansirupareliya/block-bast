@@ -451,7 +451,7 @@ export default function DogsBlocksScreen({ onBack }) {
       {complete && (
         <View style={s.overlay}>
           <View style={s.completeCard}>
-            <Text style={s.completeEmoji}>🎉</Text>
+            <Text style={s.completeEmoji}>🏆</Text>
             <Text style={s.completeTitle}>Level Completed!</Text>
             <View style={{ height: 20 }} />
             {levelIdx + 1 < LEVEL_DATA.length && (
