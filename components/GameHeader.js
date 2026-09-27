@@ -6,6 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { playTap } from '../utils/audioManager';
 import { THEME, cartoonShadow } from '../utils/blockBlastTheme';
+import BackButton from './BackButton';
 
 // Status bar height — computed once at module level
 const STATUS_H = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 44;
@@ -81,9 +82,7 @@ export default function GameHeader({
       <View style={styles.row}>
 
         {/* LEFT — Back button */}
-        <CartoonButton size={40} onPress={handleBack}>
-          <Text style={styles.chevron}>{'‹'}</Text>
-        </CartoonButton>
+        <BackButton size={40} onPress={handleBack} />
 
         {/* CENTER — Trophy + best score pill (opens the leaderboard, if wired up) */}
         <View style={styles.center}>

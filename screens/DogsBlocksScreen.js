@@ -6,6 +6,9 @@ import {
 } from 'react-native';
 import { playTap, playClick, playSuccess } from '../utils/audioManager';
 import { STORAGE_KEYS, loadNumber, saveNumber } from '../utils/storage';
+import { showInterstitial } from '../utils/interstitialAd';
+import BackButton from '../components/BackButton';
+import { LEVEL_FONT } from '../utils/fonts';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -332,9 +335,7 @@ export default function DogsBlocksScreen({ onBack }) {
       <View style={s.root}>
         <StatusBar backgroundColor="transparent" barStyle="dark-content" translucent />
         <View style={s.topBar}>
-          <TouchableOpacity onPress={() => { playTap(); onBack(); }} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
-            <Text style={s.backArrow}>←</Text>
-          </TouchableOpacity>
+          <BackButton onPress={() => { playTap(); onBack(); }} />
           <Text style={s.topTitle}>Levels</Text>
           <View style={{ width: 30 }} />
         </View>
@@ -365,9 +366,7 @@ export default function DogsBlocksScreen({ onBack }) {
       <StatusBar backgroundColor="transparent" barStyle="dark-content" translucent />
 
       <View style={s.topBar}>
-        <TouchableOpacity onPress={() => { playTap(); setView('levels'); }} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
-          <Text style={s.backArrow}>←</Text>
-        </TouchableOpacity>
+        <BackButton onPress={() => { playTap(); setView('levels'); }} />
         <View style={s.levelBadge}>
           <Text style={s.levelBadgeText}>Level-{levelIdx + 1}</Text>
         </View>
@@ -462,7 +461,7 @@ export default function DogsBlocksScreen({ onBack }) {
             <TouchableOpacity style={s.replayBtn} onPress={() => { playTap(); startLevel(levelIdx); }}>
               <Text style={s.replayBtnText}>Replay</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => { playTap(); setView('levels'); }} style={{ marginTop: 12 }}>
+            <TouchableOpacity onPress={() => { playTap(); setView('levels'); showInterstitial(); }} style={{ marginTop: 12 }}>
               <Text style={{ color: '#999', fontSize: 16 }}>All Levels</Text>
             </TouchableOpacity>
           </View>
@@ -488,7 +487,7 @@ const s = StyleSheet.create({
     shadowColor: '#4BB3FD', shadowOpacity: 0.35,
     shadowOffset: { width: 0, height: 4 }, shadowRadius: 6,
   },
-  levelBadgeText: { fontSize: 16, fontWeight: '900', color: '#FFF', letterSpacing: 0.4 },
+  levelBadgeText: { fontSize: 17, ...LEVEL_FONT, color: '#FFF', letterSpacing: 0.4 },
 
   levelsGrid: {
     flexDirection: 'row', flexWrap: 'wrap',
@@ -501,7 +500,7 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.12, shadowOffset: { width: 0, height: 3 }, shadowRadius: 3,
   },
   lvlBtnLocked: { backgroundColor: '#DCDCDC', borderColor: '#BDBDBD' },
-  lvlBtnText:       { fontSize: 20, fontWeight: '900', color: '#111' },
+  lvlBtnText:       { fontSize: 22, ...LEVEL_FONT, color: '#111' },
   lvlBtnTextLocked: { fontSize: 20, color: '#999' },
 
   // Game Board styling exactly like the dirt block

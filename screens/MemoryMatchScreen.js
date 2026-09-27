@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Dimensions, Animated, StatusBar, ScrollView,
+  Dimensions, Animated, StatusBar, ScrollView, Image, Pressable,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Rect, Defs, RadialGradient, Stop } from 'react-native-svg';
@@ -10,6 +10,13 @@ import { STORAGE_KEYS, loadNumber, saveNumber } from '../utils/storage';
 import { getPlayerName } from '../utils/playerIdentity';
 import { submitProgress } from '../utils/leaderboardService';
 import LeaderboardScreen from './LeaderboardScreen';
+import AdBanner from '../components/AdBanner';
+import { showInterstitial } from '../utils/interstitialAd';
+import BackButton from '../components/BackButton';
+import ImageButton from '../components/ImageButton';
+import ArtStartScreen from '../components/ArtStartScreen';
+import TrophyButton from '../components/TrophyButton';
+import { LEVEL_FONT } from '../utils/fonts';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -24,30 +31,33 @@ const THEMES = {
 const THEME_KEYS = Object.keys(THEMES);
 
 // ── Levels ────────────────────────────────────────────────────────────────
-// Boards are always square (rows === cols) so the grid never tapers off into
-// an uneven last row. An odd-sided square (11x11) has an odd cell count and
-// can't be filled with pure pairs, so it gets one extra pre-solved "bonus"
-// tile (see buildDeck) dropped in the dead center to fill the gap.
-const RAW = [
-  // 1-10: 4x4 grid (8 pairs)
-  [1, 8, 4], [2, 8, 4], [3, 8, 4], [4, 8, 4], [5, 8, 4], [6, 8, 4], [7, 8, 4], [8, 8, 4], [9, 8, 4], [10, 8, 4],
-  // 11-20: 6x6 grid (18 pairs)
-  [11, 18, 6], [12, 18, 6], [13, 18, 6], [14, 18, 6], [15, 18, 6], [16, 18, 6], [17, 18, 6], [18, 18, 6], [19, 18, 6], [20, 18, 6],
-  // 21-30: 8x8 grid (32 pairs)
-  [21, 32, 8], [22, 32, 8], [23, 32, 8], [24, 32, 8], [25, 32, 8], [26, 32, 8], [27, 32, 8], [28, 32, 8], [29, 32, 8], [30, 32, 8],
-  // 31-40: 10x10 grid (50 pairs)
-  [31, 50, 10], [32, 50, 10], [33, 50, 10], [34, 50, 10], [35, 50, 10], [36, 50, 10], [37, 50, 10], [38, 50, 10], [39, 50, 10], [40, 50, 10],
-  // 41-50: 11x11 grid (60 pairs + 1 center bonus tile)
-  [41, 60, 11], [42, 60, 11], [43, 60, 11], [44, 60, 11], [45, 60, 11], [46, 60, 11], [47, 60, 11], [48, 60, 11], [49, 60, 11], [50, 60, 11],
+// Boards are cols x rows (taller than wide, to fill the portrait board).
+// An odd cell count can't be filled with pure pairs, so those boards get one
+// extra pre-solved "bonus" tile (see buildDeck) dropped in the dead center.
+const GRID_BY_GROUP = [
+  { cols: 4, rows: 6 },   // levels 1-10:  24 cells, 12 pairs
+  { cols: 5, rows: 7 },   // levels 11-20: 35 cells, 17 pairs + bonus
+  { cols: 6, rows: 8 },   // levels 21-30: 48 cells, 24 pairs
+  { cols: 7, rows: 9 },   // levels 31-40: 63 cells, 31 pairs + bonus
+  { cols: 8, rows: 10 },  // levels 41-50: 80 cells, 40 pairs
 ];
+const LEVELS_PER_GROUP = 10;
 
-const LEVELS = RAW.map(([level, pairs, cols]) => ({
-  level, pairs, cols,
-  // An odd-sided square (cols is odd) can't be filled by pure pairs alone —
-  // it needs the one extra bonus tile from buildDeck.
-  bonusTile: cols % 2 === 1,
-  theme: THEME_KEYS[(level - 1) % THEME_KEYS.length],
-}));
+const LEVELS = Array.from({ length: GRID_BY_GROUP.length * LEVELS_PER_GROUP }, (_, i) => {
+  const level = i + 1;
+  const { cols, rows } = GRID_BY_GROUP[Math.floor(i / LEVELS_PER_GROUP)];
+  const cells = cols * rows;
+  return {
+    level, cols, rows,
+    pairs: Math.floor(cells / 2),
+    bonusTile: cells % 2 === 1,
+    theme: THEME_KEYS[(level - 1) % THEME_KEYS.length],
+  };
+});
+
+// Testing switch: true opens every level on the map. Set back to false
+// before release so levels unlock one by one again.
+const UNLOCK_ALL_LEVELS = false;
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function buildDeck(pairs, themeKey, withBonus) {
@@ -79,14 +89,17 @@ function buildDeck(pairs, themeKey, withBonus) {
 // tiles instead of one plain white card for every icon.
 const CARD_COLORS = ['#8FD9CE', '#FFB877', '#C9A6E8', '#F4C4D4', '#A8D98F', '#8FC1E8'];
 
-function MemoryCard({ card, size, onPress, scaleAnim, disabled }) {
+// Memoized: a tap only re-renders the cards whose data actually changed,
+// not the whole (up to 80-card) board. `onPress` must be stable; it's
+// called with the card's index.
+const MemoryCard = React.memo(function MemoryCard({ card, index, size, onPress, scaleAnim, disabled }) {
   const isVisible = card.flipped || card.matched;
   const br = size * 0.18;
   const pastel = CARD_COLORS[card.id % CARD_COLORS.length];
 
   return (
     <TouchableOpacity
-      onPress={onPress}
+      onPress={() => onPress(index)}
       activeOpacity={0.85}
       disabled={disabled || card.matched || card.flipped}
       style={{ padding: Math.max(2, size * 0.05) }}
@@ -112,7 +125,7 @@ function MemoryCard({ card, size, onPress, scaleAnim, disabled }) {
       </Animated.View>
     </TouchableOpacity>
   );
-}
+});
 
 // ── Glossy cartoon bubble button (back arrows, Play button) ──────────────
 // A chunky glossy circle — bold saturated border, a lighter-top/darker-
@@ -124,10 +137,10 @@ function CartoonButton({ size = 44, onPress, children, style }) {
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75} hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }} style={style}>
       <LinearGradient
-        colors={['#FFE27A', '#FFC93C', '#B9782E']}
+        colors={['#8FE9FF', '#29B6F6', '#0A6FD1']}
         style={{
           width: size, height: size, borderRadius: size / 2,
-          borderWidth: borderW, borderColor: '#7A4A18',
+          borderWidth: borderW, borderColor: '#063E8A',
           alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
           shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 5,
         }}
@@ -226,15 +239,22 @@ function Starburst() {
 // + colored. Each node is built as a little 3D "puck" — a wooden base disc
 // peeking out from behind a glossy gradient-shaded circle — purely from
 // Views/LinearGradient, no image assets or emoji involved.
-const PATH_NODE = 60;
-const PATH_ROW_H = 104;
+const PATH_NODE = 44;
+const PATH_ROW_H = 84;
 const PATH_PAD = 60;
 
+// Candy colors from the level-map artwork: gold like its stars and blocks
+// for finished levels, hat-ribbon pink for the current one, deep indigo
+// (blending into the background) for locked ones.
 const NODE_GRADIENT = {
-  done:    ['#8FE0FF', '#2E86D8', '#155A96'],
-  locked:  ['#E3E7EA', '#B9C0C6', '#8A9096'],
-  current: ['#9CF5B8', '#33C46B', '#187A44'],
+  done:    ['#FFE58A', '#FFB31F', '#E07A00'],
+  locked:  ['#7B72E6', '#4E43C2', '#2F268C'],
+  current: ['#FFA3E4', '#FF3FB4', '#B0157A'],
 };
+// Solid (not translucent) so the landings cleanly cover the path's ends
+// instead of the path's edges showing through them.
+const PATH_FILL = '#4B40C8';
+const PATH_EDGE = '#8F84F0';
 
 function pathNodeCenter(i, containerWidth) {
   const amplitude = (containerWidth - PATH_NODE - PATH_PAD * 2) / 2;
@@ -257,8 +277,8 @@ function PathConnector({ from, to }) {
         position: 'absolute',
         left: midX - length / 2 - width * 0.25, top: midY - width / 2,
         width: length + width * 0.5, height: width, borderRadius: width / 2,
-        backgroundColor: '#F0DDB5',
-        borderWidth: 2, borderColor: 'rgba(122,74,24,0.25)',
+        backgroundColor: PATH_FILL,
+        borderWidth: 2, borderColor: PATH_EDGE,
         transform: [{ rotate: `${angle}deg` }],
       }}
     />
@@ -279,7 +299,7 @@ function PinMarker({ size, colors }) {
         transform: [{ rotate: '45deg' }],
       }} />
       <LinearGradient colors={colors} style={[pathStyles.pinHead, { width: size, height: size, borderRadius: size / 2 }]}>
-        <View style={{ width: size * 0.42, height: size * 0.42, borderRadius: size * 0.21, backgroundColor: '#F0DDB5' }} />
+        <View style={{ width: size * 0.42, height: size * 0.42, borderRadius: size * 0.21, backgroundColor: '#FFFFFF' }} />
       </LinearGradient>
     </View>
   );
@@ -422,6 +442,26 @@ let globalUnlockedLevel = 1;
 let globalBestScore = 0;
 
 // ── Main Screen ───────────────────────────────────────────────────────────
+// ── Start screen ──────────────────────────────────────────────────────────
+// Full artwork with the PLAY button drawn in (see ArtStartScreen).
+function MatchmakerStart({ onBack, onLeaderboard, onPlay }) {
+  return (
+    <ArtStartScreen
+      bg={require('../assets/matchmaker_start_bg.jpg')}
+      fg={require('../assets/matchmaker_start_fg.png')}
+      art={{ w: 941, h: 1672 }}
+      playRect={{ x: 333, y: 1010, w: 275, h: 95 }}
+      onPlay={onPlay}
+      backgroundColor="#1E1470"
+    >
+      <View style={[startStyles.header, { flexDirection: 'row', justifyContent: 'space-between' }]}>
+        <BackButton onPress={onBack} />
+        <TrophyButton onPress={onLeaderboard} />
+      </View>
+    </ArtStartScreen>
+  );
+}
+
 export default function MatchmakerScreen({ onBack }) {
   const [view, setView] = useState('start'); // 'start' | 'game' | 'levels' | 'leaderboard'
   const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
@@ -436,8 +476,15 @@ export default function MatchmakerScreen({ onBack }) {
   const [matched, setMatched] = useState(0);
   const [complete, setComplete] = useState(false);
   const [hintActive, setHintActive] = useState(false);
+  const [boardBox, setBoardBox] = useState(null); // measured board size, for card sizing
 
   const cardAnims = useRef([]);
+  // The pair the last hint showed; repeated hints show this same pair
+  // again until it's matched, then a new one is picked.
+  const hintPairRef = useRef(null);
+  // Taps can arrive faster than React re-renders, so the current selection
+  // is also tracked in a ref (state alone could miss a quick second tap).
+  const selectedRef = useRef([]);
 
 
   // Pushes this player's current name + stage reached to the shared
@@ -482,57 +529,56 @@ export default function MatchmakerScreen({ onBack }) {
     setCurrentLevelIdx(idx);
     setCards(deck);
     cardAnims.current = deck.map(() => new Animated.Value(1));
-    setSelected([]); setCanFlip(true);
+    setSelected([]); selectedRef.current = []; hintPairRef.current = null; setCanFlip(true);
     setMatched(0); setScore(0);
     setComplete(false);
     setView('game');
   }, []);
 
-  const flipAnim = useCallback((idx, cb) => {
+  // Quick "unfold" from a thin sliver — the new face is already set when
+  // this starts, so the picture shows the instant the card is tapped.
+  const unfold = useCallback((idx) => {
     const anim = cardAnims.current[idx];
-    if (!anim) { cb?.(); return; }
-    Animated.sequence([
-      Animated.timing(anim, { toValue: 0, duration: 120, useNativeDriver: true }),
-      Animated.timing(anim, { toValue: 1, duration: 120, useNativeDriver: true }),
-    ]).start(cb);
+    if (!anim) return;
+    anim.setValue(0.15);
+    Animated.timing(anim, { toValue: 1, duration: 140, useNativeDriver: true }).start();
   }, []);
 
-  const flipBackBoth = useCallback((a, b, cb) => {
-    if (!cardAnims.current[a] || !cardAnims.current[b]) { cb?.(); return; }
-    Animated.parallel([
-      Animated.sequence([
-        Animated.timing(cardAnims.current[a], { toValue: 0, duration: 120, useNativeDriver: true }),
-        Animated.timing(cardAnims.current[a], { toValue: 1, duration: 120, useNativeDriver: true }),
-      ]),
-      Animated.sequence([
-        Animated.timing(cardAnims.current[b], { toValue: 0, duration: 120, useNativeDriver: true }),
-        Animated.timing(cardAnims.current[b], { toValue: 1, duration: 120, useNativeDriver: true }),
-      ]),
-    ]).start(cb);
+  // Fold cards shut, swap them back to "?" at the fold's midpoint (onMid),
+  // then unfold. Used for a mismatch and for ending a hint.
+  const foldBack = useCallback((indices, onMid) => {
+    const anims = indices.map((i) => cardAnims.current[i]).filter(Boolean);
+    Animated.parallel(anims.map((v) => Animated.timing(v, { toValue: 0.15, duration: 110, useNativeDriver: true })))
+      .start(() => {
+        onMid();
+        Animated.parallel(anims.map((v) => Animated.timing(v, { toValue: 1, duration: 140, useNativeDriver: true }))).start();
+      });
   }, []);
 
   const handleCardPress = useCallback((idx) => {
     if (!canFlip || cards[idx].flipped || cards[idx].matched || complete) return;
+    if (selectedRef.current.includes(idx)) return;
 
     playFlip();
-
-    flipAnim(idx, () => {
-      setCards(prev => {
-        const next = [...prev];
-        next[idx] = { ...next[idx], flipped: true };
-        return next;
-      });
+    setCards(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], flipped: true };
+      return next;
     });
+    unfold(idx);
 
-    const newSel = [...selected, idx];
-    if (newSel.length < 2) { setSelected(newSel); return; }
+    const newSel = [...selectedRef.current, idx];
+    if (newSel.length < 2) { selectedRef.current = newSel; setSelected(newSel); return; }
 
     const [a, b] = newSel;
+    selectedRef.current = [];
     setCanFlip(false);
     setSelected([]);
 
+    // A match resolves quickly; a mismatch stays up a little longer so the
+    // player can see both pictures before they flip back.
+    const isMatch = cards[a].iconName === cards[b].iconName;
     setTimeout(() => {
-      const isMatch = cards[a].iconName === cards[b].iconName;
 
       if (isMatch) {
         playMatch();
@@ -567,7 +613,7 @@ export default function MatchmakerScreen({ onBack }) {
         setCanFlip(true);
       } else {
         playMismatch();
-        flipBackBoth(a, b, () => {
+        foldBack([a, b], () => {
           setCards(prev => {
             const next = [...prev];
             next[a] = { ...next[a], flipped: false };
@@ -577,22 +623,58 @@ export default function MatchmakerScreen({ onBack }) {
           setCanFlip(true);
         });
       }
-    }, 600);
-  }, [canFlip, cards, selected, complete, matched, cfg, score, flipAnim, flipBackBoth, syncLeaderboardProgress]);
+    }, isMatch ? 250 : 650);
+  }, [canFlip, cards, complete, matched, cfg, score, unfold, foldBack, syncLeaderboardProgress]);
 
-  // Briefly reveals every still-hidden card so the player can peek at the
-  // board, then flips them all back — a real hint, not just decoration.
+  // Stable identity for MemoryCard's onPress so memoized cards don't all
+  // re-render on every tap; always calls the latest handler.
+  const pressRef = useRef(handleCardPress);
+  pressRef.current = handleCardPress;
+  const onCardPress = useCallback((idx) => pressRef.current(idx), []);
+
+  // Hint = a full-screen ad, then one matching pair revealed for a moment
+  // and turned back over. If the player already has a card face-up, the
+  // hint shows that card's partner instead.
+  const revealHint = useCallback(() => {
+    const hidden = (i) => !cards[i].matched && !cards[i].flipped;
+    const open = selectedRef.current[0];
+    let reveal;
+    if (open !== undefined) {
+      const partner = cards.findIndex((c, i) => hidden(i) && c.iconName === cards[open].iconName);
+      reveal = partner === -1 ? [] : [partner];
+    } else {
+      const last = hintPairRef.current;
+      if (last && last.every(hidden)) {
+        reveal = last;
+      } else {
+        const pool = cards.map((_, i) => i).filter(hidden);
+        const a = pool[Math.floor(Math.random() * pool.length)];
+        const b = pool.find((i) => i !== a && cards[i].iconName === cards[a].iconName);
+        reveal = a === undefined || b === undefined ? [] : [a, b];
+        hintPairRef.current = reveal.length ? reveal : null;
+      }
+    }
+
+    if (!reveal.length) { setCanFlip(true); setHintActive(false); return; }
+
+    setCards(prev => prev.map((c, i) => (reveal.includes(i) ? { ...c, flipped: true } : c)));
+    reveal.forEach(unfold);
+    setTimeout(() => {
+      foldBack(reveal, () => {
+        setCards(prev => prev.map((c, i) => (reveal.includes(i) ? { ...c, flipped: false } : c)));
+        setCanFlip(true);
+        setHintActive(false);
+      });
+    }, 1000);
+  }, [cards, unfold, foldBack]);
+
   const showHint = useCallback(() => {
     if (hintActive || complete || !canFlip) return;
     setHintActive(true);
     setCanFlip(false);
-    setCards(prev => prev.map(c => (c.matched ? c : { ...c, flipped: true })));
-    setTimeout(() => {
-      setCards(prev => prev.map(c => (c.matched ? c : { ...c, flipped: false })));
-      setCanFlip(true);
-      setHintActive(false);
-    }, 900);
-  }, [hintActive, complete, canFlip]);
+    // Reveal after the ad closes (or right away if no ad was ready).
+    showInterstitial(revealHint);
+  }, [hintActive, complete, canFlip, revealHint]);
 
   // ── Render Leaderboard Screen ───────────────────────────────────────────
   if (view === 'leaderboard') {
@@ -610,46 +692,20 @@ export default function MatchmakerScreen({ onBack }) {
   // ── Render Start Screen ─────────────────────────────────────────────────
   if (view === 'start') {
     return (
-      <View style={startStyles.root}>
-        <StatusBar backgroundColor="transparent" barStyle="dark-content" translucent />
-
-        <FloatingBackground />
-
-        {/* Large watermark ? — slow breathing pulse */}
-        <PulsingWatermark />
-
-        <View style={[startStyles.header, { flexDirection: 'row', justifyContent: 'space-between' }]}>
-          <CartoonButton size={44} onPress={() => { playTap(); onBack(); }}>
-            <Text style={startStyles.cartoonArrow}>←</Text>
-          </CartoonButton>
-          <CartoonButton size={44} onPress={() => { playTap(); setView('leaderboard'); }}>
-            <Text style={startStyles.cartoonArrow}>🏆</Text>
-          </CartoonButton>
-        </View>
-
-        <View style={startStyles.content}>
-          <Text style={startStyles.title}>Match</Text>
-          <Text style={startStyles.subtitle}>maker</Text>
-
-          <Text style={startStyles.desc}>Pairs are made in Matchmaker heaven. Start matching!</Text>
-
-          <CartoonPillButton onPress={() => { playTap(); setView('levels'); }} style={{ marginBottom: 40 }}>
-            <Text style={startStyles.playText}>Play</Text>
-            <View style={startStyles.coin}><Text style={startStyles.coinText}>150</Text></View>
-          </CartoonPillButton>
-
-          <Text style={startStyles.bestScoreLabel}>Your Best Score:</Text>
-          <Text style={startStyles.bestScoreVal}>{bestScore}</Text>
-        </View>
-      </View>
+      <MatchmakerStart
+        onBack={() => { playTap(); onBack(); }}
+        onLeaderboard={() => { playTap(); setView('leaderboard'); }}
+        onPlay={() => { playTap(); setView('levels'); }}
+      />
     );
   }
 
   // ── Render Levels Screen ────────────────────────────────────────────────
   if (view === 'levels') {
     return (
-      <View style={startStyles.root}>
-        <StatusBar backgroundColor="transparent" barStyle="dark-content" translucent />
+      <View style={startStyles.artRoot}>
+        <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
+        <Image source={require('../assets/matchmaker_levels_bg.jpg')} style={startStyles.artImage} resizeMode="cover" />
 
         {(() => {
           const pathWidth = SW;
@@ -662,7 +718,8 @@ export default function MatchmakerScreen({ onBack }) {
                   <PathConnector key={i} from={centers[i]} to={to} />
                 ))}
                 {LEVELS.map((l, i) => {
-                  const state = l.level > maxUnlockedLevel ? 'locked'
+                  const unlockedUpTo = UNLOCK_ALL_LEVELS ? LEVELS.length : maxUnlockedLevel;
+                  const state = l.level > unlockedUpTo ? 'locked'
                     : l.level === maxUnlockedLevel ? 'current' : 'done';
                   return (
                     <PathNode
@@ -686,29 +743,29 @@ export default function MatchmakerScreen({ onBack }) {
         {/* Full-bleed scenery — no header bar, just a floating back button
             over the scene, like the reference's floating circular icons.
             Rendered after the ScrollView so it always stays on top. */}
-        <CartoonButton size={44} onPress={() => { playTap(); setView('start'); }} style={pathStyles.floatingBack}>
-          <Text style={pathStyles.floatingBackArrow}>←</Text>
-        </CartoonButton>
+        <BackButton onPress={() => { playTap(); setView('start'); }} style={pathStyles.floatingBack} />
       </View>
     );
   }
 
   // ── Render Game Screen ──────────────────────────────────────────────────
-  const cols = cfg.cols;
-  // Horizontal space actually lost before a card can render, matching
-  // boardFrame's marginHorizontal (20*2) + borderWidth (4*2) and the
-  // ScrollView's contentContainerStyle padding (10*2) below — using just
-  // the outer 20*2 here (as before) undercounted this, so the computed
-  // card size was too big and rows fell one column short of `cols`,
-  // breaking the square grid shape.
-  const boardHorizontalLoss = 20 * 2 + 4 * 2 + 10 * 2;
-  // Calculate size to comfortably fit `cols` number of cards, accounting for MemoryCard's internal padding
-  const cardSize = Math.floor(((SW - boardHorizontalLoss) / cols) / 1.12);
+  const { cols, rows } = cfg;
+  // Cards are sized to fit the board both ways, so every grid fills the
+  // board instead of leaving it half empty. Before the board is measured,
+  // fall back to fitting the width (board margins 20*2 + border 4*2).
+  // Inner space = measured board minus the grid padding (10*2). Each card
+  // cell is the card plus MemoryCard's padding of max(2, 5%) per side.
+  const innerW = boardBox ? boardBox.width - 20 : SW - (20 * 2 + 4 * 2 + 10 * 2);
+  const innerH = boardBox ? boardBox.height - 20 : Infinity;
+  const cell = Math.min(innerW / cols, innerH / rows);
+  const cardSize = Math.floor(Math.min(cell / 1.1, cell - 4));
+  const cardCell = cardSize + 2 * Math.max(2, cardSize * 0.05);
   const isLastLevel = cfg.level >= LEVELS.length;
 
   return (
     <View style={gameStyles.root}>
-      <StatusBar backgroundColor="transparent" barStyle="dark-content" translucent />
+      <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
+      <Image source={require('../assets/matchmaker_levels_bg.jpg')} style={startStyles.artImage} resizeMode="cover" />
 
       {/* ── Top HUD ── */}
       <View style={gameStyles.hudRow}>
@@ -717,9 +774,7 @@ export default function MatchmakerScreen({ onBack }) {
             <Text style={gameStyles.pillIcon}>⭐</Text>
             <Text style={gameStyles.scorePillTxt}>{score}</Text>
           </View>
-          <CartoonButton size={44} onPress={() => { playTap(); setView('levels'); }} style={{ marginTop: 8 }}>
-            <Text style={gameStyles.hudIcon}>←</Text>
-          </CartoonButton>
+          <BackButton onPress={() => { playTap(); setView('levels'); }} style={{ marginTop: 8 }} />
         </View>
 
         <View style={gameStyles.targetCard}>
@@ -733,9 +788,12 @@ export default function MatchmakerScreen({ onBack }) {
             <Text style={gameStyles.levelPillTxt}>LEVEL {cfg.level}</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-            <CartoonButton size={44} onPress={() => { playTap(); startLevel(cfg.level); }}>
-              <Text style={gameStyles.hudIcon}>↻</Text>
-            </CartoonButton>
+            <ImageButton
+              source={require('../assets/restart_button.png')}
+              aspect={160 / 155}
+              size={44}
+              onPress={() => { playTap(); startLevel(cfg.level); }}
+            />
             <CartoonButton size={44} onPress={() => { playTap(); showHint(); }}>
               <Text style={gameStyles.hudIcon}>💡</Text>
             </CartoonButton>
@@ -753,21 +811,31 @@ export default function MatchmakerScreen({ onBack }) {
         </View>
       </View>
 
-      <View style={gameStyles.boardFrame}>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 10, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
-          <View style={gameStyles.grid}>
+      <View
+        style={gameStyles.boardFrame}
+        onLayout={(e) => {
+          const { width, height } = e.nativeEvent.layout;
+          // minus the frame's 4px border on each side
+          setBoardBox({ width: width - 8, height: height - 8 });
+        }}
+      >
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 10, alignItems: 'center', flexGrow: 1, justifyContent: 'center' }} showsVerticalScrollIndicator={false}>
+          <View style={[gameStyles.grid, { width: Math.ceil(cols * cardCell) + 1 }]}>
             {cards.map((card, idx) => (
               <MemoryCard
                 key={idx}
                 card={card}
                 size={cardSize}
-                onPress={() => handleCardPress(idx)}
+                index={idx}
+                onPress={onCardPress}
                 scaleAnim={cardAnims.current[idx]}
               />
             ))}
           </View>
         </ScrollView>
       </View>
+
+      <AdBanner />
 
       {/* ── Level Complete overlay ── */}
       {complete && (
@@ -783,7 +851,7 @@ export default function MatchmakerScreen({ onBack }) {
               <Text style={gameStyles.pillIcon}>🏆</Text>
               <Text style={gameStyles.coinPillTxt}>{bestScore}</Text>
             </View>
-            <TouchableOpacity style={gameStyles.closeBtn} onPress={() => { playTap(); setView('levels'); }}>
+            <TouchableOpacity style={gameStyles.closeBtn} onPress={() => { playTap(); setView('levels'); showInterstitial(); }}>
               <Text style={gameStyles.closeBtnTxt}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -802,7 +870,7 @@ export default function MatchmakerScreen({ onBack }) {
             </View>
 
             <View style={gameStyles.navRow}>
-              <TouchableOpacity style={gameStyles.navBtn} onPress={() => { playTap(); setView('levels'); }}>
+              <TouchableOpacity style={gameStyles.navBtn} onPress={() => { playTap(); setView('levels'); showInterstitial(); }}>
                 <Text style={gameStyles.navBtnTxt}>«  Back</Text>
               </TouchableOpacity>
               {!isLastLevel && (
@@ -820,6 +888,10 @@ export default function MatchmakerScreen({ onBack }) {
 
 // ── Styles ────────────────────────────────────────────────────────────────
 const startStyles = StyleSheet.create({
+  artRoot: { flex: 1, backgroundColor: '#1E1470' },
+  // Explicit size: absoluteFill alone lets Android draw the image at its own
+  // pixel size (zoomed in and blurry) instead of fitting the screen.
+  artImage: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   root: { flex: 1, backgroundColor: '#FBE4C4' },
   watermark: {
     position: 'absolute', bottom: -50, right: -50,
@@ -845,14 +917,15 @@ const pathStyles = StyleSheet.create({
   landing: {
     width: PATH_NODE * 1.55, height: PATH_NODE * 1.05,
     borderRadius: PATH_NODE,
-    backgroundColor: '#F0DDB5',
+    backgroundColor: PATH_FILL,
+    borderWidth: 2, borderColor: PATH_EDGE,
   },
   woodBase: {
-    position: 'absolute', bottom: -10,
+    position: 'absolute', bottom: -PATH_NODE * 0.16,
     width: PATH_NODE * 0.94, height: PATH_NODE * 0.5,
     borderRadius: PATH_NODE * 0.47,
-    backgroundColor: '#B9782E',
-    borderWidth: 2, borderColor: '#7A4A18',
+    backgroundColor: '#2A1E8F',
+    borderWidth: 2, borderColor: '#170F5C',
   },
   nodeFace: {
     width: PATH_NODE, height: PATH_NODE, borderRadius: PATH_NODE / 2,
@@ -862,17 +935,17 @@ const pathStyles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 3, elevation: 4,
   },
   shine: {
-    position: 'absolute', top: 7, left: 10,
+    position: 'absolute', top: PATH_NODE * 0.12, left: PATH_NODE * 0.17,
     width: PATH_NODE * 0.38, height: PATH_NODE * 0.2,
     borderRadius: PATH_NODE * 0.2,
     backgroundColor: 'rgba(255,255,255,0.4)',
     transform: [{ rotate: '-20deg' }],
   },
   nodeText: {
-    fontSize: 22, fontWeight: '900', color: '#FFFFFF',
-    textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1,
+    fontSize: 18, ...LEVEL_FONT, color: '#FFFFFF',
+    textShadowColor: 'rgba(40,15,90,0.65)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 2,
   },
-  nodeTextLocked: { color: 'rgba(255,255,255,0.9)' },
+  nodeTextLocked: { color: 'rgba(255,255,255,0.55)' },
   pinHead: {
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 3, borderColor: 'rgba(255,255,255,0.55)',
@@ -884,8 +957,11 @@ const pathStyles = StyleSheet.create({
   floatingBackArrow: { fontSize: 20, color: '#5A3410', fontWeight: '900', marginTop: -2 },
 });
 
+// Frosted indigo "glass" panels that sit on the gameplay background art.
+const GLASS = { backgroundColor: 'rgba(24,16,96,0.55)', borderColor: 'rgba(143,132,240,0.85)' };
+
 const gameStyles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F3E4C9' },
+  root: { flex: 1, backgroundColor: '#1E1470' },
 
   // ── Top HUD ──
   hudRow: {
@@ -896,41 +972,41 @@ const gameStyles = StyleSheet.create({
   pillIcon: { fontSize: 14, marginRight: 4 },
   scorePill: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#5FB4E0', borderWidth: 2, borderColor: '#2C7FAE',
+    backgroundColor: '#29B6F6', borderWidth: 2, borderColor: '#0A6FD1',
     borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12,
   },
   scorePillTxt: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
   levelPill: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#F0A868', borderWidth: 2, borderColor: '#B8722E',
+    backgroundColor: '#FF3FB4', borderWidth: 2, borderColor: '#B0157A',
     borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12,
   },
-  levelPillTxt: { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
-  hudIcon: { fontSize: 18 },
+  levelPillTxt: { fontSize: 14, ...LEVEL_FONT, color: '#FFFFFF', letterSpacing: 0.5 },
+  hudIcon: { fontSize: 20, color: '#FFFFFF', fontWeight: '900' },
   targetCard: {
     width: 84, height: 84, borderRadius: 14,
-    backgroundColor: '#FFF6E4', borderWidth: 2, borderColor: '#B8722E',
+    ...GLASS, borderWidth: 2,
     alignItems: 'center', justifyContent: 'center', marginTop: 2,
   },
-  targetLabel: { fontSize: 10, fontWeight: '800', color: '#7A5A38', letterSpacing: 0.5, marginBottom: 2 },
-  targetIcon: { fontSize: 20, fontWeight: '800', color: '#7A5A38' },
+  targetLabel: { fontSize: 10, fontWeight: '800', color: 'rgba(255,255,255,0.75)', letterSpacing: 0.5, marginBottom: 2 },
+  targetIcon: { fontSize: 20, fontWeight: '900', color: '#FFD23F' },
 
-  instruction: { textAlign: 'center', color: '#7A5A38', fontSize: 13, fontWeight: '600', marginTop: 10, marginHorizontal: 30 },
+  instruction: { textAlign: 'center', color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '700', marginTop: 10, marginHorizontal: 30 },
 
   // ── Stat pills row ──
   statRow: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginTop: 12, marginBottom: 10 },
   statPill: {
-    backgroundColor: '#FFF6E4', borderWidth: 1.5, borderColor: '#D9BE94',
+    ...GLASS, borderWidth: 1.5,
     borderRadius: 16, paddingVertical: 6, paddingHorizontal: 16,
   },
   statPillRow: { flexDirection: 'row', alignItems: 'center' },
-  statPillTxt: { fontSize: 14, fontWeight: '800', color: '#7A5A38' },
+  statPillTxt: { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
 
   // ── Board frame ──
   boardFrame: {
-    flex: 1, marginHorizontal: 20, marginBottom: 24,
-    backgroundColor: '#DCC29A', borderRadius: 22,
-    borderWidth: 4, borderColor: '#B8860B',
+    flex: 1, marginHorizontal: 20, marginBottom: 10,
+    backgroundColor: GLASS.backgroundColor, borderRadius: 22,
+    borderWidth: 4, borderColor: '#FFB31F',
     overflow: 'hidden',
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
@@ -987,8 +1063,8 @@ const cardStyles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 2, elevation: 3,
   },
   back: {
-    backgroundColor: '#C9A87C', // Flat tan — matches the reference board's empty cells
-    borderWidth: 2, borderColor: '#A9835C',
+    backgroundColor: '#6A4CE0', // purple candy, from the gameplay background art
+    borderWidth: 2, borderColor: '#3D2AA8',
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2,
   },
@@ -999,9 +1075,9 @@ const cardStyles = StyleSheet.create({
     borderRightColor: 'rgba(0,0,0,0.12)',
   },
   qMark: {
-    fontWeight: '900', color: '#7A5A38',
-    textShadowColor: 'rgba(255,255,255,0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 0
+    fontWeight: '900', color: '#FFD23F',
+    textShadowColor: 'rgba(40,15,90,0.7)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 1
   }
 });

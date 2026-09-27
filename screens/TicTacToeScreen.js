@@ -6,6 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { checkWinner, getBestMove } from '../utils/tictactoeAI';
 import { playTap, playMark, playTicTacToeWin } from '../utils/audioManager';
+import BackButton from '../components/BackButton';
 
 const { width: SW } = Dimensions.get('window');
 const BOARD_W = SW - 64;
@@ -249,9 +250,7 @@ export default function TicTacToeScreen({ onBack }) {
 
       {/* Top Header Buttons */}
       <View style={[styles.topBar, { paddingTop: STATUS_H + 10 }]}>
-        <TouchableOpacity onPress={() => { playTap(); setGameState('menu'); }} style={styles.iconBtn}>
-          <Text style={styles.iconBtnTxt}>‹</Text>
-        </TouchableOpacity>
+        <BackButton onPress={() => { playTap(); setGameState('menu'); }} />
         <TouchableOpacity onPress={() => { playTap(); restart(); }} style={styles.iconBtn}>
           <Text style={[styles.iconBtnTxt, { fontSize: 22, marginTop: -2 }]}>↻</Text>
         </TouchableOpacity>

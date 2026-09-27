@@ -8,6 +8,10 @@ import Svg, { Polygon, Rect, Line, Ellipse, Defs, RadialGradient as SvgRadialGra
 import { playTap, playClick, playSuccess, playLocked } from '../utils/audioManager';
 import { STORAGE_KEYS, loadNumber, saveNumber } from '../utils/storage';
 import { BOXPUSHER_LEVELS } from '../utils/boxPusherLevels';
+import { showInterstitial } from '../utils/interstitialAd';
+import BackButton from '../components/BackButton';
+import ArtStartScreen from '../components/ArtStartScreen';
+import { LEVEL_FONT } from '../utils/fonts';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const HIT = { top: 20, bottom: 20, left: 20, right: 20 };
@@ -616,48 +620,22 @@ export default function BoxPusherScreen({ onBack }) {
 
   // ── Render Start Screen ─────────────────────────────────────────────────
   if (view === 'start') {
-    const progressPct = Math.min(1, (maxUnlockedLevel - 1) / BOXPUSHER_LEVELS.length);
+    // Full artwork with the PLAY button drawn in (see ArtStartScreen).
+    // The art is sharp and detailed, so the filler behind it is blurred.
     return (
-      <LinearGradient colors={BG_GRADIENT} style={s.root}>
-        <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
-        <FloatingBackground />
+      <ArtStartScreen
+        bg={require('../assets/boxpusher_start_bg.jpg')}
+        fg={require('../assets/boxpusher_start_fg.png')}
+        art={{ w: 940, h: 1672 }}
+        playRect={{ x: 222, y: 1098, w: 498, h: 192 }}
+        onPlay={() => { playTap(); setView('levels'); }}
+        fillBlur={14}
+        backgroundColor="#6FB3E8"
+      >
         <View style={s.header}>
-          <GlassButton onPress={() => { playTap(); onBack(); }}>
-            <Text style={s.backArrow}>‹</Text>
-          </GlassButton>
+          <BackButton onPress={() => { playTap(); onBack(); }} />
         </View>
-        <View style={s.startContent}>
-          <View style={s.logoWrap}>
-            <LinearGradient colors={['#6FA0FF', ACCENT, '#2E4E93']} style={s.logoBadge}>
-              <View style={s.logoShine} />
-              <BubbleText size={26}>BOX</BubbleText>
-              <BubbleText size={26}>PUSHER</BubbleText>
-            </LinearGradient>
-            <View style={[s.mascotWrap, { marginTop: -46 }]}>
-              <GlowPulse size={120} color={ACCENT} />
-              <Text style={s.mascot}>🐼</Text>
-            </View>
-          </View>
-          <View style={s.descCard}>
-            <Text style={s.desc}>Push every crate onto its glowing target to clear the warehouse!</Text>
-          </View>
-
-          <View style={s.progressWrap}>
-            <Text style={s.progressStar}>⭐</Text>
-            <View style={s.progressTrack}>
-              <View style={[s.progressFill, { width: `${progressPct * 100}%` }]} />
-            </View>
-            <Text style={s.progressTxt}>{maxUnlockedLevel - 1}/{BOXPUSHER_LEVELS.length}</Text>
-          </View>
-
-          <TouchableOpacity style={s.playBtnWrap} activeOpacity={0.85} onPress={() => { playTap(); setView('levels'); }}>
-            <GlowPulse size={90} color={GOLD} style={{ top: -5 }} />
-            <LinearGradient colors={['#6FA0FF', ACCENT, '#3D66C4']} style={s.playBtn}>
-              <Text style={s.playText}>Play</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+      </ArtStartScreen>
     );
   }
 
@@ -668,9 +646,7 @@ export default function BoxPusherScreen({ onBack }) {
         <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
         <SpaceBackdrop />
         <View style={s.header}>
-          <GlassButton onPress={() => { playTap(); setView('start'); }}>
-            <Text style={s.backArrow}>‹</Text>
-          </GlassButton>
+          <BackButton onPress={() => { playTap(); setView('start'); }} />
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
@@ -699,7 +675,7 @@ export default function BoxPusherScreen({ onBack }) {
   // ── Render Game Screen ──────────────────────────────────────────────────
   const PAD = 20;
   const availW = SW - PAD * 2;
-  const availH = SH - 380; // header + stats + dpad chrome
+  const availH = SH - 440; // header + stats + dpad chrome + bottom banner ad
   let cellSize = Math.floor(Math.min(availW / Math.max(1, cols), availH / Math.max(1, rows)));
   // Levels now go up to a 13x13 maze — no lower floor beyond "still
   // visible", or a big grid on a narrow phone would overflow the screen
@@ -723,9 +699,7 @@ export default function BoxPusherScreen({ onBack }) {
       <WarehouseBackdrop width={SW} height={SH} />
 
       <View style={s.gameTopBar}>
-        <CartoonButton size={46} onPress={() => { playTap(); setView('levels'); }}>
-          <Text style={s.cartoonIcon}>‹</Text>
-        </CartoonButton>
+        <BackButton onPress={() => { playTap(); setView('levels'); }} />
         <Text style={s.gameTitle}>Level {levelIdx + 1}</Text>
         <CartoonButton size={46} onPress={() => { playTap(); resetLevel(); }}>
           <Text style={s.cartoonIcon}>↻</Text>
@@ -816,9 +790,7 @@ export default function BoxPusherScreen({ onBack }) {
           <LinearGradient colors={['#3A5A3E', '#1D2E1F', '#0F1710']} style={StyleSheet.absoluteFill} />
 
           <View style={s.completeTopBar}>
-            <CartoonButton size={40} onPress={() => { playTap(); setView('levels'); }}>
-              <Text style={[s.cartoonIcon, { fontSize: 18 }]}>‹</Text>
-            </CartoonButton>
+            <BackButton onPress={() => { playTap(); setView('levels'); showInterstitial(); }} />
           </View>
 
           <View style={s.completeCenter}>
@@ -943,7 +915,7 @@ const s = StyleSheet.create({
     transform: [{ rotate: '-4deg' }],
   },
   spaceTileNum: {
-    fontSize: 24, fontWeight: '900', color: '#FFFFFF', marginBottom: 3,
+    fontSize: 26, ...LEVEL_FONT, color: '#FFFFFF', marginBottom: 3,
     textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
   spaceTileLocked: {
@@ -958,7 +930,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingTop: 50, paddingBottom: 6,
   },
-  gameTitle: { fontSize: 18, fontWeight: '800', color: TEXT },
+  gameTitle: { fontSize: 20, ...LEVEL_FONT, color: TEXT },
   cartoonIcon: { fontSize: 22, color: '#8B2E12', fontWeight: '900', marginTop: -2 },
 
   statsBar: {
@@ -1037,7 +1009,7 @@ const s = StyleSheet.create({
     borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: '#2E7D32',
   },
 
-  levelLabel: { fontSize: 15, fontWeight: '800', color: '#7A5A38', letterSpacing: 1, marginTop: 20 },
+  levelLabel: { fontSize: 17, ...LEVEL_FONT, color: '#7A5A38', letterSpacing: 1, marginTop: 20 },
 
   mascotBurstWrap: { width: 110, height: 110, alignItems: 'center', justifyContent: 'center', marginVertical: 8 },
   mascotBurstChar: { fontSize: 64 },

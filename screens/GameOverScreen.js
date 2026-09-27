@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, Easing 
 import { LinearGradient } from 'expo-linear-gradient';
 import { playTap, playSuccess } from '../utils/audioManager';
 import { THEME } from '../utils/blockBlastTheme';
+import { maybeShowInterstitial } from '../utils/interstitialAd';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -111,6 +112,7 @@ export default function GameOverScreen({ score, bestScore, onRestart, onBack }) 
   useEffect(() => {
     // Celebratory chime when the run set a new best score.
     if (isNewRecord) playSuccess();
+    maybeShowInterstitial();
 
     Animated.parallel([
       Animated.timing(overlayOp, { toValue: 1, duration: 300, useNativeDriver: true }),

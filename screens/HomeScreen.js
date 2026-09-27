@@ -7,60 +7,17 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { playTap } from '../utils/audioManager';
 import { NEON } from '../utils/theme';
+import AdBanner from '../components/AdBanner';
+import { GAMES } from '../utils/games';
 
 const { width: SW } = Dimensions.get('window');
-
-// ── Game catalogue ────────────────────────────────────────────────────────
-const GAMES = [
-  {
-    id: 'memorymatch',
-    name: 'Matchmaker',
-    category: 'MEMORY',
-    accent: '#FFB800',
-    gradientColors: ['#FFD52E', '#FFB800', '#F29900'],
-    image: require('../assets/memorymatch_logo.jpg'),
-  },
-  {
-    id: 'tictactoe',
-    name: 'Tic-Tac-Toe',
-    category: 'STRATEGY',
-    accent: '#EE2244',
-    gradientColors: ['#FF7070', '#EE2244', '#AA0022'],
-    image: require('../assets/tictactoe_logo.jpg'),
-  },
-  {
-    id: 'blockblast',
-    name: 'Block Blast',
-    category: 'PUZZLE',
-    accent: '#1E80F0',
-    gradientColors: ['#60B8FF', '#1E80F0', '#0A55CC'],
-    image: require('../assets/blockblast_logo.jpg'),
-  },
-  {
-    id: 'boxpusher',
-    name: 'Box Pusher',
-    category: 'PUZZLE',
-    accent: '#5B8DEF',
-    gradientColors: ['#6FA0FF', '#48598C', '#141A2B'],
-    logoType: 'medallion', // original medallion-badge logo — see BoxPusherLogo
-  },
-  {
-    id: 'dogsblocks',
-    name: 'Dogs Blocks',
-    category: 'PUZZLE',
-    accent: '#C68642',
-    gradientColors: ['#F0C080', '#E8A045', '#C68642'],
-    image: require('../assets/dogsblocks_logo.jpg'),
-    disabled: true, // temporarily taken out of rotation — flip back on when ready
-  },
-];
-
 
 // ── Game tile ─────────────────────────────────────────────────────────────
 const COLS      = 2;
 const TILE_GAP  = 16;
 const TILE_W    = (SW - 32 - TILE_GAP * (COLS - 1)) / COLS;
 const TILE_H    = TILE_W * 1.3;
+const CARD_H    = TILE_W * 1.19; // height of full-card artworks (see GameTile)
 
 // Small faux-3D "bubble" wordmark for tiles that don't have dedicated art —
 // same layered-text-offset trick used for Box Pusher's in-game logo, sized
@@ -128,6 +85,43 @@ function GameTile({ game, onPress, liked, onLike, enterAnim }) {
   const onOut = () => Animated.spring(pressScale, { toValue: 1,    friction: 6, useNativeDriver: true }).start();
 
   const disabled = !!game.disabled;
+
+  // Games with a full card artwork (frame + title baked in) show only that
+  // image — no info row — with the heart tucked into the frame's corner.
+  if (game.cardImage) {
+    // Same height for every card so cards in a row line up; width follows
+    // each artwork's own aspect, capped at the tile width.
+    const imgH = Math.min(CARD_H, TILE_W / game.cardAspect);
+    const imgW = imgH * game.cardAspect;
+    const imgTop = (TILE_H - imgH) / 2;
+    const imgLeft = (TILE_W - imgW) / 2;
+    return (
+      <Animated.View style={[{ width: TILE_W }, enterAnim]}>
+        <TouchableOpacity
+          onPress={() => { playTap(); onPress(game.id); }}
+          onPressIn={onIn}
+          onPressOut={onOut}
+          activeOpacity={1}
+        >
+          <Animated.View style={{ width: TILE_W, height: TILE_H, transform: [{ scale: pressScale }] }}>
+            <Image source={game.cardImage} style={{ position: 'absolute', top: imgTop, left: imgLeft, width: imgW, height: imgH }} />
+            <TouchableOpacity
+              onPress={() => { playTap(); onLike(game.id); }}
+              style={[styles.heartBtn, { top: imgTop + imgH * 0.09, right: imgLeft + imgW * 0.11 }]}
+              activeOpacity={0.8}
+              hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            >
+              <View style={[styles.heartPill, liked && { borderColor: NEON.magenta }]}>
+                <Text style={[styles.heartIcon, { color: liked ? NEON.magenta : 'rgba(255,255,255,0.6)' }]}>
+                  {liked ? '♥' : '♡'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  }
 
   return (
     <Animated.View style={[{ width: TILE_W }, enterAnim]}>
@@ -204,9 +198,7 @@ function GameTile({ game, onPress, liked, onLike, enterAnim }) {
 }
 
 // ── HomeScreen ────────────────────────────────────────────────────────────
-export default function HomeScreen({ onSelect }) {
-  const [tab,    setTab]    = useState('all');    // 'all' | 'favorites'
-  const [likes,  setLikes]  = useState({});
+export default function HomeScreen({ onSelect, likes, onToggleLike }) {
 
   const headerY  = useRef(new Animated.Value(-20)).current;
   const headerO  = useRef(new Animated.Value(0)).current;
@@ -215,7 +207,6 @@ export default function HomeScreen({ onSelect }) {
     o: new Animated.Value(0),
   }))).current;
   const dotBlink = useRef(new Animated.Value(1)).current;
-  const blobDrift = useRef(new Animated.Value(0)).current;
   const titleGlow = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -236,30 +227,14 @@ export default function HomeScreen({ onSelect }) {
       Animated.timing(dotBlink, { toValue: 1,    duration: 900, useNativeDriver: true }),
     ])).start();
 
-    // Slow ambient drift on the background glow blobs, so the backdrop
-    // feels alive instead of a static gradient.
+    // Slow breathing pulse on the logo.
     Animated.loop(Animated.sequence([
-      Animated.timing(blobDrift, { toValue: 1, duration: 5000, useNativeDriver: true }),
-      Animated.timing(blobDrift, { toValue: 0, duration: 5000, useNativeDriver: true }),
-    ])).start();
-
-    // Slow breathing glow on the title wordmark.
-    Animated.loop(Animated.sequence([
-      Animated.timing(titleGlow, { toValue: 1, duration: 1400, useNativeDriver: false }),
-      Animated.timing(titleGlow, { toValue: 0, duration: 1400, useNativeDriver: false }),
+      Animated.timing(titleGlow, { toValue: 1, duration: 1400, useNativeDriver: true }),
+      Animated.timing(titleGlow, { toValue: 0, duration: 1400, useNativeDriver: true }),
     ])).start();
   }, []);
 
-  const blobTranslate = blobDrift.interpolate({ inputRange: [0, 1], outputRange: [0, 18] });
-  const titleGlowRadius = titleGlow.interpolate({ inputRange: [0, 1], outputRange: [6, 16] });
-
-  const toggleLike = (id) => {
-    setLikes(prev => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const displayed = tab === 'favorites'
-    ? GAMES.filter(g => likes[g.id])
-    : GAMES;
+  const logoScale = titleGlow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
 
   const statusH = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 54;
 
@@ -267,12 +242,9 @@ export default function HomeScreen({ onSelect }) {
     <View style={styles.root}>
       <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
 
-      {/* Neon Arcade backdrop */}
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: NEON.bg0 }]} />
-
-      {/* Glowing ambient blobs — slow drift for a bit of life */}
-      <Animated.View style={[styles.blobBlue, { transform: [{ translateX: blobTranslate }, { translateY: blobTranslate }] }]} />
-      <Animated.View style={[styles.blobPurple, { transform: [{ translateX: Animated.multiply(blobTranslate, -1) }] }]} />
+      {/* Forest night backdrop */}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#0B1A33' }]} />
+      <Image source={require('../assets/home_bg.jpg')} style={styles.bgImage} resizeMode="cover" />
 
       {/* Status bar spacer */}
       <View style={{ height: statusH }} />
@@ -282,9 +254,11 @@ export default function HomeScreen({ onSelect }) {
 
         {/* ── App wordmark ── */}
         <View style={styles.brandRow}>
-          <Animated.Text style={[styles.brandTitle, { textShadowRadius: titleGlowRadius }]}>
-            GAME<Text style={styles.brandTitleAccent}> HUB</Text>
-          </Animated.Text>
+          <Animated.Image
+            source={require('../assets/puzzlegame_logo.png')}
+            style={[styles.brandLogo, { transform: [{ scale: logoScale }] }]}
+            resizeMode="contain"
+          />
 
           <TouchableOpacity
             onPress={() => { playTap(); onSelect('settings'); }}
@@ -292,32 +266,10 @@ export default function HomeScreen({ onSelect }) {
             activeOpacity={0.8}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={styles.settingsIcon}>⚙️</Text>
+            <Image source={require('../assets/settings_gear.png')} style={styles.settingsIcon} resizeMode="contain" />
           </TouchableOpacity>
         </View>
 
-        {/* ── Tab bar: All Games / Favorites ── */}
-        <View style={styles.tabBar}>
-          <TouchableOpacity
-            style={[styles.tab, tab === 'all' && styles.tabActive]}
-            onPress={() => { playTap(); setTab('all'); }}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.tabTxt, tab === 'all' && styles.tabTxtActive]}>All Games</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.tab, tab === 'favorites' && styles.tabActive]}
-            onPress={() => { playTap(); setTab('favorites'); }}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.tabTxt, tab === 'favorites' && styles.tabTxtActive]}>
-              Favorites {Object.values(likes).filter(Boolean).length > 0
-                ? `(${Object.values(likes).filter(Boolean).length})`
-                : ''}
-            </Text>
-          </TouchableOpacity>
-        </View>
       </Animated.View>
 
       {/* ── Game grid ── */}
@@ -325,21 +277,14 @@ export default function HomeScreen({ onSelect }) {
         contentContainerStyle={styles.grid}
         showsVerticalScrollIndicator={false}
       >
-        {displayed.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>♡</Text>
-            <Text style={styles.emptyTitle}>No Favorites Yet</Text>
-            <Text style={styles.emptySub}>Tap ♡ on any game to add it here</Text>
-          </View>
-        ) : (
           <View style={styles.gridRow}>
-            {displayed.map((game, idx) => (
+            {GAMES.map((game, idx) => (
               <GameTile
                 key={game.id}
                 game={game}
                 onPress={onSelect}
                 liked={!!likes[game.id]}
-                onLike={toggleLike}
+                onLike={onToggleLike}
                 enterAnim={{
                   opacity: tileAnims[idx]?.o ?? 1,
                   transform: [{ translateY: tileAnims[idx]?.y ?? 0 }],
@@ -347,7 +292,6 @@ export default function HomeScreen({ onSelect }) {
               />
             ))}
           </View>
-        )}
 
         {/* Footer */}
         <View style={styles.footer}>
@@ -356,24 +300,17 @@ export default function HomeScreen({ onSelect }) {
           <View style={styles.footerDot} />
         </View>
       </ScrollView>
+
+      <AdBanner />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-
-  // Glowing ambient blobs
-  blobBlue: {
-    position: 'absolute', top: -100, left: SW / 2 - 150,
-    width: 300, height: 300, borderRadius: 150,
-    backgroundColor: NEON.cyan, opacity: 0.10,
-  },
-  blobPurple: {
-    position: 'absolute', top: -50, right: -60,
-    width: 220, height: 220, borderRadius: 110,
-    backgroundColor: NEON.magenta, opacity: 0.09,
-  },
+  // Explicit size: absoluteFill alone let Android draw the image at its own
+  // pixel size (zoomed in and blurry) instead of fitting the screen.
+  bgImage: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
 
   // ── Header ──
   header: {
@@ -384,41 +321,15 @@ const styles = StyleSheet.create({
 
   // ── App wordmark ──
   brandRow: { marginBottom: 16, alignItems: 'center', justifyContent: 'center' },
-  brandTitle: {
-    fontSize: 28, fontWeight: '900', letterSpacing: 2, color: '#FFFFFF',
-    textShadowColor: NEON.cyan, textShadowOffset: { width: 0, height: 0 },
-  },
-  brandTitleAccent: { color: NEON.magenta },
+  // Logo art is 700x467 (1.5:1).
+  brandLogo: { width: 165, height: 110 },
   settingsBtn: {
-    position: 'absolute', right: 0, top: 2,
-    width: 34, height: 34, borderRadius: 10,
+    position: 'absolute', right: 0, top: 30,
+    width: 50, height: 50,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: NEON.glassFill, borderWidth: 1, borderColor: NEON.glassBorder,
   },
-  settingsIcon: { fontSize: 16 },
+  settingsIcon: { width: 44, height: 50 },
 
-  // ── Tab bar ──
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: NEON.glassFill,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: NEON.violetDim,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 9,
-    borderRadius: 11,
-    alignItems: 'center',
-  },
-  tabActive: {
-    backgroundColor: 'rgba(0,240,255,0.12)',
-    borderWidth: 1,
-    borderColor: NEON.cyan,
-  },
-  tabTxt:       { fontSize: 13, fontWeight: '600', color: NEON.textDim },
-  tabTxtActive: { color: '#FFFFFF', fontWeight: '700' },
 
   // ── Game grid ──
   grid:    { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 },
@@ -511,13 +422,6 @@ const styles = StyleSheet.create({
   },
 
   // ── Empty state ──
-  emptyState: {
-    paddingTop: 60,
-    alignItems: 'center',
-  },
-  emptyIcon:  { fontSize: 52, color: NEON.violetDim, marginBottom: 14 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: NEON.textDim, marginBottom: 6 },
-  emptySub:   { fontSize: 13, color: NEON.textFaint, textAlign: 'center' },
 
   // ── Footer ──
   footer: {

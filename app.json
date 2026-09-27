@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "BlockBlast",
+    "name": "Puzzle Game Hub",
     "slug": "BlockBlast",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/app-icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
@@ -15,10 +15,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/app-icon-adaptive.png",
+        "backgroundColor": "#DDD7DA"
       },
       "package": "com.mansirupareliyasteam.BlockBlast",
       "permissions": [
@@ -39,7 +37,15 @@
     "owner": "mansirupareliyas-team",
     "plugins": [
       "expo-audio",
-      "expo-asset"
+      "expo-asset",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3809470409595542~9927759154",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ],
+      "expo-font"
     ]
   }
 }

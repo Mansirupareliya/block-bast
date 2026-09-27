@@ -5,6 +5,8 @@ import { playTap } from '../utils/audioManager';
 import { isFirebaseConfigured } from '../utils/firebase';
 import { subscribeLeaderboard } from '../utils/leaderboardService';
 import { getDeviceId } from '../utils/playerIdentity';
+import BackButton from '../components/BackButton';
+import { LEVEL_FONT } from '../utils/fonts';
 
 // Same glossy cartoon bubble button recipe as Matchmaker's own CartoonButton
 // (components/GameHeader.js documents the shared language) — duplicated
@@ -88,9 +90,7 @@ export default function LeaderboardScreen({
       <StatusBar backgroundColor="transparent" barStyle="dark-content" translucent />
 
       <View style={styles.header}>
-        <CartoonButton size={44} onPress={() => { playTap(); onBack(); }}>
-          <Text style={styles.backArrow}>←</Text>
-        </CartoonButton>
+        <BackButton onPress={() => { playTap(); onBack(); }} />
         <Text style={styles.title}>{title}</Text>
         <View style={{ width: 44 }} />
       </View>
@@ -167,6 +167,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0A868', borderWidth: 1.5, borderColor: '#B8722E',
     borderRadius: 12, paddingVertical: 3, paddingHorizontal: 9, marginRight: 8,
   },
-  stagePillTxt: { fontSize: 11, fontWeight: '800', color: '#FFFFFF' },
+  stagePillTxt: { fontSize: 12, ...LEVEL_FONT, color: '#FFFFFF' },
   score: { fontSize: 13, fontWeight: '800', color: '#7A5A38', minWidth: 44, textAlign: 'right' },
 });

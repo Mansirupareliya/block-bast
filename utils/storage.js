@@ -17,6 +17,7 @@ export const STORAGE_KEYS = {
   MATCHMAKER_MAX_UNLOCKED: '@matchmaker:maxUnlockedLevel',
   MATCHMAKER_BEST_SCORE: '@matchmaker:bestScore',
   BOXPUSHER_MAX_UNLOCKED: '@boxpusher:maxUnlockedLevel',
+  FAVORITES: '@hub:favorites',
 };
 
 // Loads a persisted integer, falling back to `fallback` if nothing was ever
@@ -40,6 +41,25 @@ export const loadNumber = async (key, fallback = 0) => {
 export const saveNumber = (key, value) => {
   if (!AsyncStorage) return;
   AsyncStorage.setItem(key, String(value)).catch((error) => {
+    console.log('Error saving value:', key, error);
+  });
+};
+
+// Same as loadNumber/saveNumber, for small JSON values (objects, arrays).
+export const loadJSON = async (key, fallback = null) => {
+  if (!AsyncStorage) return fallback;
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    return raw == null ? fallback : JSON.parse(raw);
+  } catch (error) {
+    console.log('Error loading stored value:', key, error);
+    return fallback;
+  }
+};
+
+export const saveJSON = (key, value) => {
+  if (!AsyncStorage) return;
+  AsyncStorage.setItem(key, JSON.stringify(value)).catch((error) => {
     console.log('Error saving value:', key, error);
   });
 };
