@@ -1,10 +1,11 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Dimensions, StatusBar, ScrollView, Animated,
+  Dimensions, StatusBar, ScrollView, Animated, Image, Pressable,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Polygon, Rect, Line, Ellipse, Defs, RadialGradient as SvgRadialGradient, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
+import Svg, { Polygon } from 'react-native-svg';
+import { hapticTap, hapticFail } from '../utils/haptics';
 import { playTap, playClick, playSuccess, playLocked } from '../utils/audioManager';
 import { STORAGE_KEYS, loadNumber, saveNumber } from '../utils/storage';
 import { BOXPUSHER_LEVELS } from '../utils/boxPusherLevels';
@@ -130,10 +131,10 @@ function CartoonButton({ size = 60, onPress, disabled, children, style }) {
       style={style}
     >
       <LinearGradient
-        colors={disabled ? ['#9AA0A8', '#767C84', '#565B62'] : ['#FFE27A', '#FFC93C', '#E8790E']}
+        colors={disabled ? ['#9AA0A8', '#767C84', '#565B62'] : ['#FFF8E8', THEME.cream, THEME.creamEdge]}
         style={{
           width: size, height: size, borderRadius: size / 2,
-          borderWidth: borderW, borderColor: disabled ? '#4A4F56' : '#C1461B',
+          borderWidth: borderW, borderColor: disabled ? '#4A4F56' : THEME.purple,
           alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
           shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 4, elevation: 6,
         }}
@@ -277,181 +278,70 @@ function Star({ size = 12, filled }) {
   );
 }
 
-// ── Space backdrop: starfield + drifting planets (Levels screen) ─────────
-function Twinkle({ x, y, size, duration, delay }) {
-  const t = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.timing(t, { toValue: 1, duration, useNativeDriver: true }),
-        Animated.timing(t, { toValue: 0, duration, useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [t, duration, delay]);
-  const opacity = t.interpolate({ inputRange: [0, 1], outputRange: [0.25, 1] });
-  return (
-    <Animated.View style={{
-      position: 'absolute', top: y, left: x, width: size, height: size,
-      borderRadius: size / 2, backgroundColor: '#FFFFFF', opacity,
-    }} />
-  );
-}
+// ── Sakura courtyard game theme ───────────────────────────────────────────
+// The courtyard art fills the whole screen on every phone. It's scaled to
+// cover (keeping its proportions, never stretched); on phones taller than the
+// art only a thin strip of the side decorations is trimmed, while the paved
+// courtyard in the middle always stays in view.
+const THEME = {
+  purple: '#4B2E6B', purpleDark: '#2E1A45',
+  cream: '#F7EEDA', creamEdge: '#CDBF9C',
+  pink: '#F7A8C4', pinkDeep: '#E86FA8',
+  stone: '#D9CDA8', grout: 'rgba(110,92,55,0.45)',
+  roof: '#3E4658', roofEdge: '#262C3A', roofHi: '#5D6782',
+  wood: '#6B4526',
+};
 
-const STAR_DOTS = Array.from({ length: 26 }, (_, i) => ({
-  x: `${(i * 37) % 100}%`,
-  y: `${(i * 53) % 100}%`,
-  size: 1.5 + (i % 3),
-  duration: 1200 + (i % 5) * 300,
-  delay: (i % 7) * 200,
-}));
-
-function Planet({ style, colors, ringColor }) {
-  return (
-    <View style={style}>
-      <LinearGradient colors={colors} start={{ x: 0.25, y: 0.2 }} end={{ x: 0.9, y: 1 }} style={StyleSheet.absoluteFill} />
-      {ringColor && (
-        <View style={{
-          position: 'absolute', top: '35%', left: -10, right: -10, height: '18%',
-          borderTopWidth: 3, borderColor: ringColor, opacity: 0.6, transform: [{ rotate: '-12deg' }],
-        }} />
-      )}
-      <View style={{
-        position: 'absolute', top: '55%', left: 0, right: 0, bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.28)', borderBottomLeftRadius: 999, borderBottomRightRadius: 999,
-      }} />
-    </View>
-  );
-}
-
-function SpaceBackdrop() {
-  return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {STAR_DOTS.map((d, i) => <Twinkle key={i} {...d} />)}
-      <Planet
-        style={{ position: 'absolute', top: -30, left: -40, width: 120, height: 120, borderRadius: 60, overflow: 'hidden' }}
-        colors={['#8FD98F', '#3E8F4E']}
-      />
-      <Planet
-        style={{ position: 'absolute', top: SH * 0.32, right: -50, width: 140, height: 140, borderRadius: 70, overflow: 'hidden' }}
-        colors={['#FFB27A', '#C4622E']}
-        ringColor="rgba(255,255,255,0.5)"
-      />
-      <Planet
-        style={{ position: 'absolute', bottom: -50, left: -30, width: 130, height: 130, borderRadius: 65, overflow: 'hidden' }}
-        colors={['#9CC9FF', '#3D5FA0']}
-      />
-    </View>
-  );
-}
-
-// ── Warehouse backdrop (game screen) ──────────────────────────────────────
-// A stylized "crate warehouse floor" scene behind the puzzle board — a
-// perspective tiled floor converging toward a horizon, a warm spotlight
-// pooling over the play area, hanging lamps, and a couple of stacked
-// crates in the corners for depth. Built entirely from SVG shapes/
-// gradients (react-native-svg, already a project dependency) — a distinct
-// "industrial" palette from the Start/Levels screens' navy/space look.
-function CrateStack({ x, y, scale = 1 }) {
-  const w = 46 * scale, h = 34 * scale;
+// `blurred` swaps in a pre-blurred copy of the art (and dims it a little) for
+// pages where it sits behind lots of UI, like the level grid. Pre-blurred
+// rather than blurRadius, since Android applies blurRadius at the image's own
+// pixel size, so the same radius looks much weaker on a big screen.
+function CourtyardBackdrop({ blurred = false }) {
   return (
     <>
-      <Ellipse cx={x + w / 2} cy={y + h + 6 * scale} rx={w * 0.55} ry={7 * scale} fill="rgba(0,0,0,0.35)" />
-      <Rect x={x} y={y} width={w} height={h} rx={4} fill="url(#crateFace)" stroke="#5A3A16" strokeWidth={2} />
-      <Line x1={x} y1={y} x2={x + w} y2={y + h} stroke="#5A3A16" strokeWidth={1.5} opacity={0.5} />
-      <Line x1={x + w} y1={y} x2={x} y2={y + h} stroke="#5A3A16" strokeWidth={1.5} opacity={0.5} />
-      <Rect x={x} y={y - h * 0.82} width={w * 0.78} height={h * 0.78} rx={4} fill="url(#crateFace)" stroke="#5A3A16" strokeWidth={2} />
+      <Image
+        source={blurred ? require('../assets/boxpusher/courtyard_blur.jpg') : require('../assets/boxpusher/courtyard_bg.jpg')}
+        style={s.bgFill}
+        resizeMode="cover"
+      />
+      {blurred && <View style={[s.bgFill, { backgroundColor: 'rgba(30,18,45,0.25)' }]} />}
     </>
   );
 }
 
-function HangingLamp({ x }) {
+// D-pad key drawn from the sakura button art; sinks a little while pressed.
+const DPAD_ART = {
+  up: require('../assets/boxpusher/btn_up.png'),
+  down: require('../assets/boxpusher/btn_down.png'),
+  left: require('../assets/boxpusher/btn_left.png'),
+  right: require('../assets/boxpusher/btn_right.png'),
+  undo: require('../assets/boxpusher/btn_undo.png'),
+};
+const DPAD_W = 82;
+const DPAD_H = DPAD_W / 1.19; // button art is ~1.19:1
+
+function DpadButton({ kind, onPress }) {
   return (
-    <>
-      <Line x1={x} y1={0} x2={x} y2={26} stroke="rgba(0,0,0,0.4)" strokeWidth={3} />
-      <Ellipse cx={x} cy={26} rx={16} ry={10} fill="#3A2E22" />
-      <Ellipse cx={x} cy={70} rx={70} ry={90} fill="url(#lampGlow)" />
-    </>
-  );
-}
-
-function WarehouseBackdrop({ width, height }) {
-  const floorTop = height * 0.42;
-  const tileRows = 7;
-  return (
-    // width/height as "100%" (not fixed pixel props) so this actually
-    // stretches to fill whatever its container really measures — a fixed
-    // pixel size left a gap on devices where the true drawable area is
-    // taller than Dimensions.get('window') reports (common with Android's
-    // edge-to-edge display), showing blank space beneath it. viewBox keeps
-    // all the floor/lamp/crate math below working in width×height
-    // coordinates regardless of the actual rendered size.
-    <Svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={StyleSheet.absoluteFill}>
-      <Defs>
-        <SvgLinearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#3A2C22" />
-          <Stop offset="1" stopColor="#241A13" />
-        </SvgLinearGradient>
-        <SvgLinearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#8A5A2E" />
-          <Stop offset="1" stopColor="#4A2E15" />
-        </SvgLinearGradient>
-        <SvgLinearGradient id="crateFace" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor="#C68642" />
-          <Stop offset="1" stopColor="#8A5A2E" />
-        </SvgLinearGradient>
-        <SvgRadialGradient id="spotlight" cx="50%" cy="38%" r="55%">
-          <Stop offset="0" stopColor="#FFE9A6" stopOpacity={0.35} />
-          <Stop offset="1" stopColor="#FFE9A6" stopOpacity={0} />
-        </SvgRadialGradient>
-        <SvgRadialGradient id="lampGlow" cx="50%" cy="0%" r="80%">
-          <Stop offset="0" stopColor="#FFE9A6" stopOpacity={0.3} />
-          <Stop offset="1" stopColor="#FFE9A6" stopOpacity={0} />
-        </SvgRadialGradient>
-      </Defs>
-
-      {/* Back wall */}
-      <Rect x={0} y={0} width={width} height={floorTop} fill="url(#wall)" />
-      {/* Floor */}
-      <Rect x={0} y={floorTop} width={width} height={height - floorTop} fill="url(#floor)" />
-
-      {/* Perspective floor tiles — lines converging toward a horizon point
-          at the wall/floor seam, giving the flat floor a sense of depth. */}
-      {Array.from({ length: tileRows }).map((_, i) => {
-        const t = i / tileRows;
-        const y = floorTop + (height - floorTop) * (t * t);
-        return <Line key={'h' + i} x1={0} y1={y} x2={width} y2={y} stroke="rgba(0,0,0,0.18)" strokeWidth={2} />;
-      })}
-      {[-1.5, -1, -0.5, 0, 0.5, 1, 1.5].map((m, i) => (
-        <Line
-          key={'v' + i}
-          x1={width / 2 + m * width * 0.06} y1={floorTop}
-          x2={width / 2 + m * width * 0.9} y2={height}
-          stroke="rgba(0,0,0,0.18)" strokeWidth={2}
+    <Pressable onPress={onPress} hitSlop={6}>
+      {({ pressed }) => (
+        <Image
+          source={DPAD_ART[kind]}
+          style={{ width: DPAD_W, height: DPAD_H, transform: [{ scale: pressed ? 0.9 : 1 }], opacity: pressed ? 0.85 : 1 }}
+          resizeMode="contain"
         />
-      ))}
-
-      {/* Warm overhead spotlight pooling over the play area */}
-      <Rect x={0} y={0} width={width} height={height} fill="url(#spotlight)" />
-
-      {/* Hanging warehouse lamps */}
-      <HangingLamp x={width * 0.22} />
-      <HangingLamp x={width * 0.78} />
-
-      {/* Crate stacks tucked in the corners for depth */}
-      <CrateStack x={-6} y={floorTop - 18} scale={1.1} />
-      <CrateStack x={width - 52} y={floorTop - 14} scale={1} />
-    </Svg>
+      )}
+    </Pressable>
   );
 }
 
-// ── Level tile with a mount-in fade/scale animation ──────────────────────
-// Glossy square tile — number + 3-star rating for done/current, a plain
-// locked tile with just the lock icon otherwise. Stars are only filled for
-// levels actually solved; the "current" (next-to-play) tile shows empty
-// stars plus a gold glow ring, matching the reference's highlighted tile.
+// ── Level tile: sakura plaque with the level number ───────────────────────
+// Same stone-and-sakura plaque as the D-pad keys, blank in the middle for the
+// number. Solved levels get 3 filled stars, the next level to play pulses
+// with a pink glow, and locked levels are a grey plaque with a lock.
+const TILE_COLS = 4;
+const TILE_W = Math.min(84, (SW - 40) / TILE_COLS - 10);
+const TILE_H = TILE_W / 1.15; // plaque art is 240x209
+
 function LevelTile({ num, state, onPress }) {
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -462,34 +352,32 @@ function LevelTile({ num, state, onPress }) {
   }, []);
 
   const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
-  const opacity = anim;
-  const starsFilled = state === 'done';
+  const locked = state === 'locked';
 
   return (
-    <Animated.View style={{ opacity, transform: [{ scale }], margin: 7 }}>
-      <TouchableOpacity
-        disabled={state === 'locked'}
-        onPress={onPress}
-        activeOpacity={state === 'locked' ? 1 : 0.8}
-      >
-        {state === 'current' && <GlowPulse size={78} color={GOLD} />}
-        {state === 'locked' ? (
-          <View style={s.spaceTileLocked}>
-            <LockIcon size={20} color="rgba(255,255,255,0.4)" holeColor="#1B2338" />
+    <Animated.View style={{ opacity: anim, transform: [{ scale }], margin: 5, alignItems: 'center' }}>
+      <Pressable onPress={onPress} hitSlop={4}>
+        {({ pressed }) => (
+          <View style={{ width: TILE_W, height: TILE_H, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.92 : 1 }] }}>
+            {state === 'current' && <GlowPulse size={TILE_W * 1.05} color={THEME.pinkDeep} />}
+            <Image
+              source={locked ? require('../assets/boxpusher/plaque_locked.png') : require('../assets/boxpusher/plaque.png')}
+              style={[StyleSheet.absoluteFill, { width: TILE_W, height: TILE_H }]}
+              resizeMode="contain"
+            />
+            {locked ? (
+              <LockIcon size={TILE_W * 0.26} color="#6B6B6B" holeColor="#E4E4E4" />
+            ) : (
+              <Text style={[s.plaqueNum, { fontSize: TILE_W * 0.3 }]}>{num}</Text>
+            )}
           </View>
-        ) : (
-          <LinearGradient
-            colors={state === 'current' ? ['#FFE9A6', '#FFD23F', '#C79A1E'] : ['#AFCFFF', '#5B8DEF', '#2E4E93']}
-            style={s.spaceTile}
-          >
-            <View style={s.spaceTileShine} />
-            <Text style={[s.spaceTileNum, state === 'current' && { color: '#3A2900' }]}>{num}</Text>
-            <View style={{ flexDirection: 'row', gap: 2 }}>
-              {[0, 1, 2].map((i) => <Star key={i} size={11} filled={starsFilled} />)}
-            </View>
-          </LinearGradient>
         )}
-      </TouchableOpacity>
+      </Pressable>
+      {!locked && (
+        <View style={{ flexDirection: 'row', gap: 2, marginTop: 2 }}>
+          {[0, 1, 2].map((i) => <Star key={i} size={12} filled={state === 'done'} />)}
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -577,7 +465,8 @@ export default function BoxPusherScreen({ onBack }) {
     const [pr, pc] = player.split(',').map(Number);
     const nr = pr + dr, nc = pc + dc;
     const nk = `${nr},${nc}`;
-    if (walls.has(nk)) return;
+    if (walls.has(nk)) { hapticFail(); return; }
+    hapticTap();
 
     if (crates.has(nk)) {
       const nnr = nr + dr, nnc = nc + dc;
@@ -642,15 +531,21 @@ export default function BoxPusherScreen({ onBack }) {
   // ── Render Levels Screen ────────────────────────────────────────────────
   if (view === 'levels') {
     return (
-      <LinearGradient colors={['#171B3A', '#0E1130', '#070818']} style={s.root}>
+      <View style={[s.root, { backgroundColor: '#6E6A5E' }]}>
         <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
-        <SpaceBackdrop />
-        <View style={s.header}>
+        <CourtyardBackdrop blurred />
+        <View style={s.levelsHeader}>
           <BackButton onPress={() => { playTap(); setView('start'); }} />
+          <View style={s.gameTitlePill}>
+            <Text style={s.gameTitle}>Levels</Text>
+          </View>
+          <View style={s.levelsCount}>
+            <Text style={s.levelsCountTxt}>{Math.min(maxUnlockedLevel - 1, BOXPUSHER_LEVELS.length)}/{BOXPUSHER_LEVELS.length}</Text>
+          </View>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
+        <ScrollView contentContainerStyle={s.levelsScroll} showsVerticalScrollIndicator={false}>
+          <View style={s.levelsPanel}>
             {BOXPUSHER_LEVELS.map((_, i) => {
               const num = i + 1;
               const state = num > maxUnlockedLevel ? 'locked' : num === maxUnlockedLevel ? 'current' : 'done';
@@ -668,14 +563,14 @@ export default function BoxPusherScreen({ onBack }) {
             })}
           </View>
         </ScrollView>
-      </LinearGradient>
+      </View>
     );
   }
 
   // ── Render Game Screen ──────────────────────────────────────────────────
   const PAD = 20;
   const availW = SW - PAD * 2;
-  const availH = SH - 440; // header + stats + dpad chrome + bottom banner ad
+  const availH = SH - 450; // header + stats + dpad chrome + bottom banner ad
   let cellSize = Math.floor(Math.min(availW / Math.max(1, cols), availH / Math.max(1, rows)));
   // Levels now go up to a 13x13 maze — no lower floor beyond "still
   // visible", or a big grid on a narrow phone would overflow the screen
@@ -694,13 +589,15 @@ export default function BoxPusherScreen({ onBack }) {
   const character = CHARACTERS[levelIdx % CHARACTERS.length];
 
   return (
-    <View style={[s.root, { backgroundColor: '#241A13' }]}>
+    <View style={[s.root, { backgroundColor: '#6E6A5E' }]}>
       <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
-      <WarehouseBackdrop width={SW} height={SH} />
+      <CourtyardBackdrop />
 
       <View style={s.gameTopBar}>
         <BackButton onPress={() => { playTap(); setView('levels'); }} />
-        <Text style={s.gameTitle}>Level {levelIdx + 1}</Text>
+        <View style={s.gameTitlePill}>
+          <Text style={s.gameTitle}>Level {levelIdx + 1}</Text>
+        </View>
         <CartoonButton size={46} onPress={() => { playTap(); resetLevel(); }}>
           <Text style={s.cartoonIcon}>↻</Text>
         </CartoonButton>
@@ -759,25 +656,15 @@ export default function BoxPusherScreen({ onBack }) {
         </View>
       </View>
 
-      {/* ── D-Pad (glossy cartoon bubble buttons) ── */}
+      {/* ── D-Pad (sakura button art) ── */}
       <View style={s.dpadWrap} pointerEvents={complete ? 'none' : 'auto'}>
-        <CartoonButton size={62} onPress={() => tryMove('up')}>
-          <Text style={s.cartoonArrow}>▲</Text>
-        </CartoonButton>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <CartoonButton size={62} onPress={() => tryMove('left')}>
-            <Text style={s.cartoonArrow}>◀</Text>
-          </CartoonButton>
-          <CartoonButton size={62} onPress={undo}>
-            <Text style={s.cartoonUndo}>↩</Text>
-          </CartoonButton>
-          <CartoonButton size={62} onPress={() => tryMove('right')}>
-            <Text style={s.cartoonArrow}>▶</Text>
-          </CartoonButton>
+        <DpadButton kind="up" onPress={() => tryMove('up')} />
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <DpadButton kind="left" onPress={() => tryMove('left')} />
+          <DpadButton kind="undo" onPress={() => { playTap(); undo(); }} />
+          <DpadButton kind="right" onPress={() => tryMove('right')} />
         </View>
-        <CartoonButton size={62} onPress={() => tryMove('down')}>
-          <Text style={s.cartoonArrow}>▼</Text>
-        </CartoonButton>
+        <DpadButton kind="down" onPress={() => tryMove('down')} />
       </View>
 
       {/* Reserved (invisible) space for a banner ad below the controls —
@@ -900,83 +787,93 @@ const s = StyleSheet.create({
   },
   playText: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
 
-  // Levels screen
-  spaceTile: {
-    width: 68, height: 68, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)',
-    overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 4, elevation: 5,
-  },
-  spaceTileShine: {
-    position: 'absolute', top: -10, left: -10, right: -10, height: '55%',
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderBottomLeftRadius: 40, borderBottomRightRadius: 40,
-    transform: [{ rotate: '-4deg' }],
-  },
-  spaceTileNum: {
-    fontSize: 26, ...LEVEL_FONT, color: '#FFFFFF', marginBottom: 3,
-    textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
-  },
-  spaceTileLocked: {
-    width: 68, height: 68, borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-
   // Game screen chrome
   gameTopBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingTop: 50, paddingBottom: 6,
   },
-  gameTitle: { fontSize: 20, ...LEVEL_FONT, color: TEXT },
-  cartoonIcon: { fontSize: 22, color: '#8B2E12', fontWeight: '900', marginTop: -2 },
+  gameTitlePill: {
+    backgroundColor: THEME.cream, borderWidth: 3, borderColor: THEME.purple,
+    borderRadius: 18, paddingVertical: 5, paddingHorizontal: 18,
+  },
+  gameTitle: { fontSize: 20, ...LEVEL_FONT, color: THEME.purple },
+  cartoonIcon: { fontSize: 22, color: THEME.purple, fontWeight: '900', marginTop: -2 },
+  bgFill: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
+
+  // Levels page (sakura theme)
+  levelsHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingTop: 50, paddingBottom: 10,
+  },
+  levelsCount: {
+    minWidth: 52, alignItems: 'center',
+    backgroundColor: THEME.purple, borderRadius: 14, borderWidth: 2, borderColor: THEME.cream,
+    paddingVertical: 4, paddingHorizontal: 8,
+  },
+  levelsCountTxt: { fontSize: 13, ...LEVEL_FONT, color: THEME.cream },
+  levelsScroll: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 100 },
+  // Frosted purple card behind the grid so every plaque (including the
+  // first row, which sits over the busy rooftops) reads clearly.
+  levelsPanel: {
+    flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center',
+    paddingVertical: 12, paddingHorizontal: 4,
+    backgroundColor: 'rgba(46,26,69,0.6)',
+    borderRadius: 22, borderWidth: 3, borderColor: 'rgba(247,238,218,0.85)',
+  },
+  plaqueNum: {
+    ...LEVEL_FONT, color: THEME.purple, marginTop: 4,
+    textShadowColor: 'rgba(255,255,255,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1,
+  },
 
   statsBar: {
-    flexDirection: 'row', backgroundColor: GLASS,
+    flexDirection: 'row', backgroundColor: 'rgba(247,238,218,0.94)',
     marginHorizontal: 20, marginTop: 6, marginBottom: 14,
     borderRadius: 16, paddingVertical: 10,
     justifyContent: 'space-around', alignItems: 'center',
-    borderWidth: 1, borderColor: GLASS_BORDER,
+    borderWidth: 3, borderColor: THEME.purple,
   },
   statItem: { alignItems: 'center' },
-  statLabel: { fontSize: 10, color: TEXT_DIM, letterSpacing: 0.5 },
-  statValue: { fontSize: 17, fontWeight: '800', color: TEXT },
-  statDivider: { width: 1, height: 18, backgroundColor: 'rgba(255,255,255,0.15)' },
+  statLabel: { fontSize: 10, color: THEME.pinkDeep, fontWeight: '900', letterSpacing: 0.8 },
+  statValue: { fontSize: 17, ...LEVEL_FONT, color: THEME.purple },
+  statDivider: { width: 2, height: 22, backgroundColor: 'rgba(75,46,107,0.25)' },
 
   // Board
   boardWrap: { alignItems: 'center', justifyContent: 'center', flexGrow: 0 },
+  // Stone-paved courtyard in a wooden frame: floor = pale flagstones,
+  // walls = slate roof tiles, targets = purple/sakura seals (matching the
+  // D-pad art).
   board: {
-    backgroundColor: '#1B2338',
+    backgroundColor: THEME.roofEdge,
     borderRadius: 12,
-    borderWidth: 3, borderColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 5, borderColor: THEME.wood,
     overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8,
   },
   cell: { alignItems: 'center', justifyContent: 'center' },
-  wallCell: { backgroundColor: '#141A2B', borderWidth: 0.5, borderColor: 'rgba(0,0,0,0.3)' },
-  floorCell: { backgroundColor: '#3A4568', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.06)' },
+  wallCell: {
+    backgroundColor: THEME.roof,
+    borderWidth: 1, borderColor: THEME.roofEdge, borderTopColor: THEME.roofHi,
+  },
+  floorCell: { backgroundColor: THEME.stone, borderWidth: 1, borderColor: THEME.grout },
   targetRing: {
-    width: '46%', height: '46%', borderRadius: 999,
-    borderWidth: 2.5, borderColor: GOLD,
-    shadowColor: GOLD, shadowOpacity: 0.9, shadowRadius: 6, shadowOffset: { width: 0, height: 0 },
+    width: '52%', height: '52%', borderRadius: 999,
+    borderWidth: 3, borderColor: THEME.purple,
+    backgroundColor: THEME.pink,
   },
   crateWrap: {
-    width: '82%', height: '82%', borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    width: '86%', height: '86%', borderRadius: 8,
+    backgroundColor: 'rgba(107,69,38,0.18)',
+    borderWidth: 1.5, borderColor: 'rgba(107,69,38,0.45)',
     alignItems: 'center', justifyContent: 'center',
   },
   crateOnTarget: {
-    backgroundColor: 'rgba(255,210,63,0.22)',
-    borderColor: GOLD,
+    backgroundColor: 'rgba(247,168,196,0.7)',
+    borderColor: THEME.purple, borderWidth: 2.5,
   },
 
   // D-Pad (glossy cartoon bubble buttons — see CartoonButton)
-  dpadWrap: { alignItems: 'center', marginTop: 'auto', marginBottom: 14, gap: 10 },
+  dpadWrap: { alignItems: 'center', marginTop: 'auto', marginBottom: 14, gap: 2 },
   adSlot: { height: 60, marginBottom: 16 },
-  cartoonArrow: { fontSize: 24, color: '#8B2E12', fontWeight: '900' },
-  cartoonUndo: { fontSize: 22, color: '#8B2E12', fontWeight: '900' },
 
   // Complete overlay
   overlay: { justifyContent: 'center', alignItems: 'center' },

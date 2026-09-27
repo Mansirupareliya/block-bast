@@ -36,5 +36,24 @@ service cloud.firestore {
         && request.resource.data.bestScore is int
         && request.resource.data.bestScore >= 0;
     }
+
+    // Daily play streak + coin balance, mirrored from each device's local
+    // storage (utils/dailyStreak.js). Also read as the coin leaderboard.
+    match /playerStreaks/{deviceId} {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasOnly(['name', 'streak', 'bestStreak', 'coins', 'totalDays', 'lastPlayDate', 'updatedAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 20
+        && request.resource.data.streak is int
+        && request.resource.data.streak >= 0
+        && request.resource.data.bestStreak is int
+        && request.resource.data.bestStreak >= request.resource.data.streak
+        && request.resource.data.coins is int
+        && request.resource.data.coins >= 0
+        && request.resource.data.totalDays is int
+        && request.resource.data.totalDays >= 0
+        && request.resource.data.lastPlayDate is string;
+    }
   }
 }

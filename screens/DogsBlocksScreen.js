@@ -4,6 +4,7 @@ import {
   Dimensions, StatusBar, ScrollView,
   PanResponder, Animated, Image
 } from 'react-native';
+import { hapticTap } from '../utils/haptics';
 import { playTap, playClick, playSuccess } from '../utils/audioManager';
 import { STORAGE_KEYS, loadNumber, saveNumber } from '../utils/storage';
 import { showInterstitial } from '../utils/interstitialAd';
@@ -153,6 +154,7 @@ function DraggablePiece({
     onMoveShouldSetPanResponder:  () => !placed,
 
     onPanResponderGrant: () => {
+      hapticTap();
       isDragging.current = true;
       pan.setValue({ x: 0, y: 0 });
     },

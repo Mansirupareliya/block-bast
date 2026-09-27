@@ -1,3 +1,5 @@
+import { hapticTap, hapticPlace, hapticSuccess, hapticFail } from './haptics';
+
 let AudioModule = null;
 
 try {
@@ -103,29 +105,37 @@ const playSoundSafely = (assetPath, { volume = 1, rate = 1 } = {}) => {
 };
 
 export const playClick = () => {
+  hapticPlace();
   playSoundSafely(require('../assets/click.mp3'));
 };
 
 // Light tap sound for UI buttons / picking up a piece — same sample as
 // playClick, kept as a distinct name so call sites read as intent.
 export const playTap = () => {
+  hapticTap();
   playSoundSafely(require('../assets/click.mp3'), { volume: 0.7 });
 };
 
 export const playSuccess = () => {
+  hapticSuccess();
   playSoundSafely(require('../assets/win.mp3'));
 };
 
 export const playFail = () => {
+  hapticFail();
   // Reuse click for fail if we don't have a distinct fail sound downloaded
   playSoundSafely(require('../assets/click.mp3'));
 };
+
+// Every play* helper below also fires a matching vibration (utils/haptics.js),
+// so any action with a sound gets haptic feedback too.
 
 // ── Matchmaker-specific variants ─────────────────────────────────────────
 // A dedicated camera-shutter-style "click" for flipping a card, so it reads
 // as a distinct action from the generic UI tap/click sound used everywhere
 // else in the app.
 export const playFlip = () => {
+  hapticPlace();
   playSoundSafely(require('../assets/flip.wav'), { volume: 0.9 });
 };
 
@@ -134,16 +144,19 @@ export const playFlip = () => {
 // (playWin, still win.mp3). playMismatch stays on click.mp3, slowed down
 // for a dull "buzz".
 export const playMatch = () => {
+  hapticSuccess();
   playSoundSafely(require('../assets/match.wav'), { volume: 1 });
 };
 
 export const playMismatch = () => {
+  hapticFail();
   playSoundSafely(require('../assets/click.mp3'), { volume: 0.55, rate: 0.6 });
 };
 
 // Level complete — a fuller two-note "ta-da" instead of a single chime,
 // so finishing a level feels bigger than just matching one pair.
 export const playWin = () => {
+  hapticSuccess();
   playSoundSafely(require('../assets/win.mp3'), { volume: 1, rate: 0.85 });
   setTimeout(() => {
     playSoundSafely(require('../assets/win.mp3'), { volume: 1, rate: 1.2 });
@@ -153,6 +166,7 @@ export const playWin = () => {
 // Tapping a still-locked level tile — a short warning "denied" cue instead
 // of just doing nothing, so the tap still feels acknowledged.
 export const playLocked = () => {
+  hapticFail();
   playSoundSafely(require('../assets/locked.wav'), { volume: 0.8 });
 };
 
@@ -161,11 +175,13 @@ export const playLocked = () => {
 // generic UI click/tap used everywhere else. Used for both the player's
 // move and the AI's move.
 export const playMark = () => {
+  hapticPlace();
   playSoundSafely(require('../assets/tictactoe_mark.wav'), { volume: 0.9 });
 };
 
 // A round won (X or O gets 3 in a row) — a dedicated win notification,
 // distinct from the generic playSuccess() chime used elsewhere.
 export const playTicTacToeWin = () => {
+  hapticSuccess();
   playSoundSafely(require('../assets/tictactoe_win.wav'), { volume: 1 });
 };

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { PanResponder, Dimensions, Animated, Easing } from 'react-native';
+import { hapticTap } from '../utils/haptics';
 import PieceView from './PieceView';
 
 const { width: SW } = Dimensions.get('window');
@@ -52,6 +53,7 @@ export default function DraggablePiece({
       onStartShouldSetPanResponder: () => !disabled,
       onMoveShouldSetPanResponder:  () => !disabled,
       onPanResponderGrant: (e) => {
+        hapticTap();
         Animated.spring(liftScale, {
           toValue: 1.18, friction: 4, tension: 220, useNativeDriver: true,
         }).start();

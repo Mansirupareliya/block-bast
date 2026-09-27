@@ -18,6 +18,9 @@ export const STORAGE_KEYS = {
   MATCHMAKER_BEST_SCORE: '@matchmaker:bestScore',
   BOXPUSHER_MAX_UNLOCKED: '@boxpusher:maxUnlockedLevel',
   FAVORITES: '@hub:favorites',
+  DAILY_STREAK: '@hub:dailyStreak',
+  MUSIC_ENABLED: '@hub:musicEnabled',
+  VIBRATION_ENABLED: '@hub:vibrationEnabled',
 };
 
 // Loads a persisted integer, falling back to `fallback` if nothing was ever

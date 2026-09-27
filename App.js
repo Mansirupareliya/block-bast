@@ -12,6 +12,9 @@ import SettingsScreen    from './screens/SettingsScreen';
 import AdBanner          from './components/AdBanner';
 import { preloadInterstitial } from './utils/interstitialAd';
 import { STORAGE_KEYS, loadJSON, saveJSON } from './utils/storage';
+import { GAMES } from './utils/games';
+import { loadStreak, recordPlay } from './utils/dailyStreak';
+import { initMusic } from './utils/backgroundMusic';
 import { useFonts } from 'expo-font';
 import { FONT_FILES } from './utils/fonts';
 
@@ -37,6 +40,13 @@ export default function App() {
       return next;
     });
   };
+
+  useEffect(() => { loadStreak(); initMusic(); }, []);
+
+  // Opening any game counts today toward the daily play streak.
+  useEffect(() => {
+    if (GAMES.some((g) => g.id === screen)) recordPlay();
+  }, [screen]);
 
   useEffect(() => {
     mobileAds().initialize()

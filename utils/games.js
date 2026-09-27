@@ -8,6 +8,8 @@ export const GAMES = [
     accent: '#FFB800',
     gradientColors: ['#FFD52E', '#FFB800', '#F29900'],
     image: require('../assets/matchmaker_logo.jpg'),
+    cardImage: require('../assets/matchmaker_card.png'), // full card art, 600x734
+    cardAspect: 600 / 734,
   },
   {
     id: 'tictactoe',

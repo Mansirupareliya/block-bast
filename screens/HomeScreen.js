@@ -9,6 +9,7 @@ import { playTap } from '../utils/audioManager';
 import { NEON } from '../utils/theme';
 import AdBanner from '../components/AdBanner';
 import { GAMES } from '../utils/games';
+import StreakBadge from '../components/StreakBadge';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -260,6 +261,8 @@ export default function HomeScreen({ onSelect, likes, onToggleLike }) {
             resizeMode="contain"
           />
 
+          <StreakBadge style={styles.streakBadge} />
+
           <TouchableOpacity
             onPress={() => { playTap(); onSelect('settings'); }}
             style={styles.settingsBtn}
@@ -329,6 +332,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   settingsIcon: { width: 44, height: 50 },
+  streakBadge: { position: 'absolute', left: 0, top: 14 },
 
 
   // ── Game grid ──
