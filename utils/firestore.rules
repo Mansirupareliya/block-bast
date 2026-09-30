@@ -10,7 +10,7 @@
 //
 // One collection per game: matchmakerLeaderboard (has maxLevel, since
 // Matchmaker has discrete stages) and blockblastLeaderboard (score only,
-// since Block Blast is endless). Add another `match` block the same shape
+// since Block Puzzle is endless). Add another `match` block the same shape
 // if a third game gets a leaderboard later.
 rules_version = '2';
 service cloud.firestore {

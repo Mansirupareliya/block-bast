@@ -1,29 +1,29 @@
-// AdMob wiring. Ad unit IDs below are Google's public TEST ids, so ads work
-// in any build (dev, debug APK, or release APK) without risking policy
-// strikes on a real account. Once you create your own ad units in the AdMob
-// console, paste them in below — the moment the placeholder "XXXX..." text
-// is gone, that placement automatically switches from test to real ads.
+// AdMob wiring. Real ad unit IDs come from .env (EXPO_PUBLIC_ADMOB_*), and
+// whether they're used at all is decided by EXPO_PUBLIC_USE_TEST_ADS, which
+// eas.json sets per build profile: development/preview builds get Google's
+// public TEST ids, the production (Play Store) build gets the real ones.
+// Dev-server builds (__DEV__) always use test ads so tapping around while
+// developing can never trigger an AdMob policy strike on the real account.
 import { Platform } from 'react-native';
 import { TestIds } from 'react-native-google-mobile-ads';
 
-// Flip to false once BANNER_REAL / INTERSTITIAL_REAL below are each a
-// correct, distinct, real ad unit ID and your AdMob app has been approved
-// (new apps can take 24-48h). While true every placement always uses
-// Google's guaranteed-fill test ads, so you can verify placements work
-// without depending on account approval or network luck.
-const FORCE_TEST_ADS = true;
+// process.env.EXPO_PUBLIC_* must be written out literally — Expo replaces
+// each one with its value at bundle time and doesn't support dynamic access.
+const USE_TEST_ADS = __DEV__ || process.env.EXPO_PUBLIC_USE_TEST_ADS !== 'false';
 
 const BANNER_REAL = Platform.select({
-  android: 'ca-app-pub-3809470409595542/8514515848', // your real Android banner ad unit ID
-  ios: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',      // TODO: your iOS banner ad unit ID
+  android: process.env.EXPO_PUBLIC_ADMOB_BANNER_ANDROID,
+  ios: process.env.EXPO_PUBLIC_ADMOB_BANNER_IOS,
 });
 
 const INTERSTITIAL_REAL = Platform.select({
-  android: 'ca-app-pub-3809470409595542/8514515843', // your real Android interstitial ad unit ID
-  ios: 'ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ',      // TODO: your iOS interstitial ad unit ID
+  android: process.env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_ANDROID,
+  ios: process.env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_IOS,
 });
 
-const isPlaceholder = (id) => !id || id.includes('XXXXXXXXXXXXXXXX');
+// A missing ID (e.g. iOS not set up yet) falls back to test ads rather than
+// requesting an empty ad unit.
+const pick = (real, test) => (USE_TEST_ADS || !real ? test : real);
 
-export const BANNER_AD_UNIT_ID = (FORCE_TEST_ADS || isPlaceholder(BANNER_REAL)) ? TestIds.BANNER : BANNER_REAL;
-export const INTERSTITIAL_AD_UNIT_ID = (FORCE_TEST_ADS || isPlaceholder(INTERSTITIAL_REAL)) ? TestIds.INTERSTITIAL : INTERSTITIAL_REAL;
+export const BANNER_AD_UNIT_ID = pick(BANNER_REAL, TestIds.BANNER);
+export const INTERSTITIAL_AD_UNIT_ID = pick(INTERSTITIAL_REAL, TestIds.INTERSTITIAL);

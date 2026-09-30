@@ -1,11 +1,11 @@
 // Custom fonts, loaded once in App.js before anything renders.
-// QuickZap is used for every level number / "LEVEL N" label.
-// NOTE: its license (assets/fonts/QuickZap-LICENSE.txt) is Freeware,
-// Non-Commercial — buy a commercial license before shipping with ads.
+// Lilita One is used for every level number / "LEVEL N" label.
+// License: SIL Open Font License 1.1 (assets/fonts/LilitaOne-LICENSE.txt),
+// free for commercial use, including apps with ads.
 export const FONT_FILES = {
-  QuickZap: require('../assets/fonts/QuickZap.ttf'),
+  LilitaOne: require('../assets/fonts/LilitaOne-Regular.ttf'),
 };
 
 // Android picks a fallback system font when a custom family is combined
 // with a fontWeight it doesn't have, so level-number styles drop fontWeight.
-export const LEVEL_FONT = { fontFamily: 'QuickZap', fontWeight: 'normal' };
+export const LEVEL_FONT = { fontFamily: 'LilitaOne', fontWeight: 'normal' };

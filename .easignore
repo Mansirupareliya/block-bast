@@ -1,3 +1,7 @@
+﻿# EAS Build uses this file INSTEAD of .gitignore when uploading the project.
+# Same as .gitignore, except .env is NOT listed here, so EAS still gets the
+# ad unit IDs even though .env is kept out of GitHub.
+
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
 # dependencies
@@ -40,5 +44,3 @@ yarn-error.*
 /ios
 /android
 
-# AdMob ids and other local config (see .env.example)
-.env

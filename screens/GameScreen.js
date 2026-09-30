@@ -398,7 +398,7 @@ export default function GameScreen({ onBack }) {
 
       {/* ── Header ── */}
       <GameHeader
-        title="Block Blast"
+        title="Block Puzzle"
         subtitle={`BEST: ${bestScore.toLocaleString()}`}
         onBack={onBack}
         liked={liked}

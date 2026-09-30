@@ -10,7 +10,7 @@ const TOP_N = 50;
 // keyed by a random local device id — no authentication involved. Firestore
 // rules (utils/firestore.rules) only validate the shape of the data being
 // written, not who's writing it. `maxLevel` is omitted for games (like
-// Block Blast) that don't have discrete stages, only a running score.
+// Block Puzzle) that don't have discrete stages, only a running score.
 export async function submitProgress(collectionName, { name, maxLevel, bestScore }) {
   if (!isFirebaseConfigured) throw new Error('Leaderboard is not configured yet.');
   const deviceId = await getDeviceId();

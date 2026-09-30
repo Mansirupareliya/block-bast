@@ -1,6 +1,6 @@
-// ── Block Blast: Bright Cartoon theme ───────────────────────────────────
+// ── Block Puzzle: Bright Cartoon theme ───────────────────────────────────
 // A separate palette from utils/theme.js (the dark "Neon Arcade" theme
-// used by HomeScreen and other games) — Block Blast alone is being
+// used by HomeScreen and other games) — Block Puzzle alone is being
 // reskinned to a warm, playful, sunlit look, so its tokens live here
 // rather than overwriting the shared NEON palette other screens depend on.
 //

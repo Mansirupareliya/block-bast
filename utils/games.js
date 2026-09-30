@@ -23,7 +23,7 @@ export const GAMES = [
   },
   {
     id: 'blockblast',
-    name: 'Block Blast',
+    name: 'Block Puzzle',
     category: 'PUZZLE',
     accent: '#1E80F0',
     gradientColors: ['#60B8FF', '#1E80F0', '#0A55CC'],

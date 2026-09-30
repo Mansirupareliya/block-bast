@@ -63,7 +63,7 @@ function LeaderboardRow({ item, rank, isMe, showStage }) {
 // Reusable across every game's leaderboard — pass the Firestore collection
 // name and the ranking fields (see utils/leaderboardService.js) for that
 // game. `showStage` hides the "Stage N" pill for games with no discrete
-// levels (e.g. Block Blast, which only tracks a running high score).
+// levels (e.g. Block Puzzle, which only tracks a running high score).
 export default function LeaderboardScreen({
   onBack, collectionName, sortFields, title = 'Leaderboard', showStage = true,
 }) {

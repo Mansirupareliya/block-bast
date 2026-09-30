@@ -78,7 +78,7 @@ export function showInterstitial(onDone) {
   return false;
 }
 
-// Block Blast game-over: roughly every other run, so the very first run of
+// Block Puzzle game-over: roughly every other run, so the very first run of
 // a session is never interrupted.
 export function maybeShowInterstitial() {
   gameOverCount += 1;
