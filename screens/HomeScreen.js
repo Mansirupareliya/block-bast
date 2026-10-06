@@ -14,11 +14,11 @@ import StreakBadge from '../components/StreakBadge';
 const { width: SW } = Dimensions.get('window');
 
 // ── Game tile ─────────────────────────────────────────────────────────────
-const COLS      = 2;
-const TILE_GAP  = 16;
-const TILE_W    = (SW - 32 - TILE_GAP * (COLS - 1)) / COLS;
-const TILE_H    = TILE_W * 1.3;
-const CARD_H    = TILE_W * 1.19; // height of full-card artworks (see GameTile)
+const COLS = 2;
+const TILE_GAP = 16;
+const TILE_W = (SW - 32 - TILE_GAP * (COLS - 1)) / COLS;
+const TILE_H = TILE_W * 1.3;
+const CARD_H = TILE_W * 1.19; // height of full-card artworks (see GameTile)
 
 // Small faux-3D "bubble" wordmark for tiles that don't have dedicated art —
 // same layered-text-offset trick used for Box Pusher's in-game logo, sized
@@ -82,8 +82,8 @@ function BoxPusherLogo({ size }) {
 
 function GameTile({ game, onPress, liked, onLike, enterAnim }) {
   const pressScale = useRef(new Animated.Value(1)).current;
-  const onIn  = () => Animated.spring(pressScale, { toValue: 0.94, friction: 8, useNativeDriver: true }).start();
-  const onOut = () => Animated.spring(pressScale, { toValue: 1,    friction: 6, useNativeDriver: true }).start();
+  const onIn = () => Animated.spring(pressScale, { toValue: 0.94, friction: 8, useNativeDriver: true }).start();
+  const onOut = () => Animated.spring(pressScale, { toValue: 1, friction: 6, useNativeDriver: true }).start();
 
   const disabled = !!game.disabled;
 
@@ -201,8 +201,8 @@ function GameTile({ game, onPress, liked, onLike, enterAnim }) {
 // ── HomeScreen ────────────────────────────────────────────────────────────
 export default function HomeScreen({ onSelect, likes, onToggleLike }) {
 
-  const headerY  = useRef(new Animated.Value(-20)).current;
-  const headerO  = useRef(new Animated.Value(0)).current;
+  const headerY = useRef(new Animated.Value(-20)).current;
+  const headerO = useRef(new Animated.Value(0)).current;
   const tileAnims = useRef(GAMES.map(() => ({
     y: new Animated.Value(30),
     o: new Animated.Value(0),
@@ -225,7 +225,7 @@ export default function HomeScreen({ onSelect, likes, onToggleLike }) {
 
     Animated.loop(Animated.sequence([
       Animated.timing(dotBlink, { toValue: 0.25, duration: 900, useNativeDriver: true }),
-      Animated.timing(dotBlink, { toValue: 1,    duration: 900, useNativeDriver: true }),
+      Animated.timing(dotBlink, { toValue: 1, duration: 900, useNativeDriver: true }),
     ])).start();
 
     // Slow breathing pulse on the logo.
@@ -280,21 +280,21 @@ export default function HomeScreen({ onSelect, likes, onToggleLike }) {
         contentContainerStyle={styles.grid}
         showsVerticalScrollIndicator={false}
       >
-          <View style={styles.gridRow}>
-            {GAMES.map((game, idx) => (
-              <GameTile
-                key={game.id}
-                game={game}
-                onPress={onSelect}
-                liked={!!likes[game.id]}
-                onLike={onToggleLike}
-                enterAnim={{
-                  opacity: tileAnims[idx]?.o ?? 1,
-                  transform: [{ translateY: tileAnims[idx]?.y ?? 0 }],
-                }}
-              />
-            ))}
-          </View>
+        <View style={styles.gridRow}>
+          {GAMES.map((game, idx) => (
+            <GameTile
+              key={game.id}
+              game={game}
+              onPress={onSelect}
+              liked={!!likes[game.id]}
+              onLike={onToggleLike}
+              enterAnim={{
+                opacity: tileAnims[idx]?.o ?? 1,
+                transform: [{ translateY: tileAnims[idx]?.y ?? 0 }],
+              }}
+            />
+          ))}
+        </View>
 
         {/* Footer */}
         <View style={styles.footer}>
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
 
 
   // ── Game grid ──
-  grid:    { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 },
+  grid: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 },
   gridRow: { flexDirection: 'row', flexWrap: 'wrap', gap: TILE_GAP },
 
   // ── Game tile ──
