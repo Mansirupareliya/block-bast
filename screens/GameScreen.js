@@ -23,6 +23,7 @@ import {
   canPlacePiece, placePiece, clearLines,
   calculateScore, countPieceCells, checkGameOver,
 } from '../utils/gameLogic';
+import { useBackHandler } from '../utils/useBackHandler';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const CELL_SIZE    = Math.floor((SW - 32) / BOARD_SIZE);
@@ -179,6 +180,7 @@ let globalBestScore = 0;
 
 export default function GameScreen({ onBack }) {
   const [view,          setView]        = useState('game'); // 'game' | 'leaderboard'
+  useBackHandler(() => (view === 'leaderboard' ? setView('game') : onBack()));
   const [board,        setBoard]        = useState(createEmptyBoard);
   const [pieces,       setPieces]       = useState(() => getRandomPieces(3));
   const [score,        setScore]        = useState(0);

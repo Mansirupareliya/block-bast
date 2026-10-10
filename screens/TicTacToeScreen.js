@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { checkWinner, getBestMove } from '../utils/tictactoeAI';
 import { playTap, playMark, playTicTacToeWin } from '../utils/audioManager';
 import BackButton from '../components/BackButton';
+import { useBackHandler } from '../utils/useBackHandler';
 
 const { width: SW } = Dimensions.get('window');
 const BOARD_W = SW - 64;
@@ -15,6 +16,7 @@ const STATUS_H = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 4
 
 export default function TicTacToeScreen({ onBack }) {
   const [gameState, setGameState] = useState('menu'); // 'menu', 'name_entry', 'playing'
+  useBackHandler(() => (gameState === 'menu' ? onBack() : setGameState('menu')));
   const [gameMode, setGameMode]   = useState('ai');   // 'ai', 'pvp'
   
   const [p1Name, setP1Name] = useState('Player 1');

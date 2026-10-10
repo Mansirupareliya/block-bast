@@ -10,6 +10,7 @@ import { STORAGE_KEYS, loadNumber, saveNumber } from '../utils/storage';
 import { showInterstitial } from '../utils/interstitialAd';
 import BackButton from '../components/BackButton';
 import { LEVEL_FONT } from '../utils/fonts';
+import { useBackHandler } from '../utils/useBackHandler';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -236,6 +237,7 @@ function DraggablePiece({
 // ── Main Screen ───────────────────────────────────────────────────────────
 export default function DogsBlocksScreen({ onBack }) {
   const [view,         setView]         = useState('levels');
+  useBackHandler(() => (view === 'game' ? setView('levels') : onBack()));
   const [levelIdx,     setLevelIdx]     = useState(0);
   const [maxUnlocked,  setMaxUnlocked]  = useState(globalUnlocked);
   const [placed,       setPlaced]       = useState([]);  // [{pieceId, anchorR, anchorC}]

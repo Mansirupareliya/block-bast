@@ -17,6 +17,7 @@ import ImageButton from '../components/ImageButton';
 import ArtStartScreen from '../components/ArtStartScreen';
 import TrophyButton from '../components/TrophyButton';
 import { LEVEL_FONT } from '../utils/fonts';
+import { useBackHandler } from '../utils/useBackHandler';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -464,6 +465,12 @@ function MatchmakerStart({ onBack, onLeaderboard, onPlay }) {
 
 export default function MatchmakerScreen({ onBack }) {
   const [view, setView] = useState('start'); // 'start' | 'game' | 'levels' | 'leaderboard'
+  // Hardware back mirrors the on-screen back buttons: game → levels → start → hub.
+  useBackHandler(() => {
+    if (view === 'game') setView('levels');
+    else if (view === 'start') onBack();
+    else setView('start');
+  });
   const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
   const [maxUnlockedLevel, setMaxUnlockedLevel] = useState(globalUnlockedLevel);
   const [bestScore, setBestScore] = useState(globalBestScore); // arbitrary scoring for UI

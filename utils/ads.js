@@ -21,9 +21,15 @@ const INTERSTITIAL_REAL = Platform.select({
   ios: process.env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_IOS,
 });
 
+const NATIVE_REAL = Platform.select({
+  android: process.env.EXPO_PUBLIC_ADMOB_NATIVE_ANDROID,
+  ios: process.env.EXPO_PUBLIC_ADMOB_NATIVE_IOS,
+});
+
 // A missing ID (e.g. iOS not set up yet) falls back to test ads rather than
 // requesting an empty ad unit.
 const pick = (real, test) => (USE_TEST_ADS || !real ? test : real);
 
 export const BANNER_AD_UNIT_ID = pick(BANNER_REAL, TestIds.BANNER);
 export const INTERSTITIAL_AD_UNIT_ID = pick(INTERSTITIAL_REAL, TestIds.INTERSTITIAL);
+export const NATIVE_AD_UNIT_ID = pick(NATIVE_REAL, TestIds.NATIVE);

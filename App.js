@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import mobileAds from 'react-native-google-mobile-ads';
 import HomeScreen        from './screens/HomeScreen';
 import GameScreen        from './screens/GameScreen';
@@ -10,7 +10,7 @@ import DogsBlocksScreen  from './screens/DogsBlocksScreen';
 import BoxPusherScreen   from './screens/BoxPusherScreen';
 import SettingsScreen    from './screens/SettingsScreen';
 import AdBanner          from './components/AdBanner';
-import { preloadInterstitial } from './utils/interstitialAd';
+import { preloadInterstitial, showInterstitial } from './utils/interstitialAd';
 import { STORAGE_KEYS, loadJSON, saveJSON } from './utils/storage';
 import { GAMES } from './utils/games';
 import { loadStreak, recordPlay } from './utils/dailyStreak';
@@ -41,6 +41,11 @@ export default function App() {
     });
   };
 
+  // Leaving Block Puzzle, Matchmaker or Box Pusher for Home (on-screen back
+  // button or phone back) shows a full-screen ad over Home. Switch first so a
+  // second back press while the ad loads can't fire this twice.
+  const leaveGameWithAd = () => { setScreen('home'); showInterstitial(); };
+
   useEffect(() => { loadStreak(); initMusic(); }, []);
 
   // Opening any game counts today toward the daily play streak.
@@ -59,18 +64,18 @@ export default function App() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <GestureHandlerRootView style={styles.root}>
+    <SafeAreaProvider style={styles.root}>
       <View style={styles.root}>
         {screen === 'home'        && <HomeScreen        onSelect={setScreen} likes={likes} onToggleLike={toggleLike} />}
-        {screen === 'blockblast'  && <GameScreen         onBack={() => setScreen('home')} />}
+        {screen === 'blockblast'  && <GameScreen         onBack={leaveGameWithAd} />}
         {screen === 'tictactoe'   && <TicTacToeScreen    onBack={() => setScreen('home')} />}
-        {screen === 'memorymatch' && <MemoryMatchScreen  onBack={() => setScreen('home')} />}
+        {screen === 'memorymatch' && <MemoryMatchScreen  onBack={leaveGameWithAd} />}
         {screen === 'dogsblocks'  && <DogsBlocksScreen   onBack={() => setScreen('home')} />}
-        {screen === 'boxpusher'   && <BoxPusherScreen    onBack={() => setScreen('home')} />}
+        {screen === 'boxpusher'   && <BoxPusherScreen    onBack={leaveGameWithAd} />}
         {screen === 'settings'    && <SettingsScreen     onBack={() => setScreen('home')} onSelect={setScreen} likes={likes} onToggleLike={toggleLike} />}
       </View>
       {GAMES_WITH_BANNER.includes(screen) && <AdBanner />}
-    </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }
 

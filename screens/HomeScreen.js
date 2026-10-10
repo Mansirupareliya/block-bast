@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { playTap } from '../utils/audioManager';
 import { NEON } from '../utils/theme';
 import AdBanner from '../components/AdBanner';
+import NativeAdTile from '../components/NativeAdTile';
 import { GAMES } from '../utils/games';
 import StreakBadge from '../components/StreakBadge';
 
@@ -294,6 +295,8 @@ export default function HomeScreen({ onSelect, likes, onToggleLike }) {
               }}
             />
           ))}
+          {/* Sponsored card — fills the grid slot after the games */}
+          <NativeAdTile width={TILE_W} height={TILE_H} />
         </View>
 
         {/* Footer */}

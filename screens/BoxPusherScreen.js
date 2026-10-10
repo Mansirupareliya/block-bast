@@ -13,6 +13,7 @@ import { showInterstitial } from '../utils/interstitialAd';
 import BackButton from '../components/BackButton';
 import ArtStartScreen from '../components/ArtStartScreen';
 import { LEVEL_FONT } from '../utils/fonts';
+import { useBackHandler } from '../utils/useBackHandler';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const HIT = { top: 20, bottom: 20, left: 20, right: 20 };
@@ -387,6 +388,12 @@ let globalUnlockedLevel = 1;
 // ── Main Screen ───────────────────────────────────────────────────────────
 export default function BoxPusherScreen({ onBack }) {
   const [view, setView] = useState('start'); // 'start' | 'levels' | 'game'
+  // Hardware back mirrors the on-screen back buttons: game → levels → start → hub.
+  useBackHandler(() => {
+    if (view === 'game') setView('levels');
+    else if (view === 'levels') setView('start');
+    else onBack();
+  });
   const [levelIdx, setLevelIdx] = useState(0);
   const [maxUnlockedLevel, setMaxUnlockedLevel] = useState(globalUnlockedLevel);
 
