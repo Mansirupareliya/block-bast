@@ -1,8 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Pressable, Dimensions, Easing } from 'react-native';
+import { View, StyleSheet, Animated, Pressable, Dimensions, Easing } from 'react-native';
+import { Text } from './AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Polygon, Path, Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { LEVEL_FONT } from '../utils/fonts';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import FitBox from './FitBox';
 
 // Bright "hyper-casual" win popup: mint-to-sky gradient with falling
 // confetti, a white card topped by a big gold star + green tick, the score
@@ -166,6 +169,7 @@ export default function LevelCompletePopup({ stars, score, info, onNext, onHome,
   const glowScale = glow.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.15] });
   const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.8] });
   const popScale = (v) => v.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+  const insets = useSafeAreaInsets();
 
   return (
     <View style={[StyleSheet.absoluteFill, s.root]}>
@@ -176,6 +180,7 @@ export default function LevelCompletePopup({ stars, score, info, onNext, onHome,
       />
       {Array.from({ length: 30 }, (_, i) => <Confetti key={i} seed={i + 1} />)}
 
+      <FitBox style={{ paddingTop: insets.top + 12, paddingBottom: 12 }}>
       <Animated.View style={{ opacity: card, transform: [{ scale: cardScale }], alignItems: 'center' }}>
         <View style={s.card}>
           {/* Star crown sitting over the top edge of the card */}
@@ -230,6 +235,7 @@ export default function LevelCompletePopup({ stars, score, info, onNext, onHome,
           )}
         </View>
       </Animated.View>
+      </FitBox>
     </View>
   );
 }

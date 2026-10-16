@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Text, View, StyleSheet } from 'react-native';
+import { Animated, View, StyleSheet } from 'react-native';
+import { Text } from './AppText';
 
 export default function ScoreAnimation({ score, x, y, onDone }) {
   const opacity   = useRef(new Animated.Value(1)).current;

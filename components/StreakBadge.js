@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, Image, Modal, ScrollView, Animated,
-  FlatList, ActivityIndicator,
+  View, TouchableOpacity, StyleSheet, Image, Modal, ScrollView, Animated, FlatList, ActivityIndicator,
 } from 'react-native';
+import { Text } from './AppText';
 import { playTap } from '../utils/audioManager';
 import { NEON } from '../utils/theme';
 import { LEVEL_FONT } from '../utils/fonts';

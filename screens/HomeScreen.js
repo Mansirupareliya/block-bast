@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  Dimensions, Animated, StatusBar, Platform,
-  ScrollView, Image,
+  View, TouchableOpacity, StyleSheet, Dimensions, Animated, StatusBar, Platform, ScrollView, Image,
 } from 'react-native';
+import { Text } from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { playTap } from '../utils/audioManager';
 import { NEON } from '../utils/theme';

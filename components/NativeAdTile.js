@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Image, StyleSheet } from 'react-native';
+import { Text } from './AppText';
 import {
   NativeAd, NativeAdView, NativeAsset, NativeAssetType, NativeMediaView,
 } from 'react-native-google-mobile-ads';

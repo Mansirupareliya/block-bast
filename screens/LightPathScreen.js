@@ -1,8 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  Dimensions, StatusBar, Animated, Pressable,
+  View, TouchableOpacity, StyleSheet, Dimensions, StatusBar, Animated, Pressable,
 } from 'react-native';
+import { Text } from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Line, Polygon, Rect, Circle, Path, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { playTap, playClick, playWin, playLocked, playMatch, playMismatch } from '../utils/audioManager';
@@ -17,6 +17,7 @@ import { showInterstitial } from '../utils/interstitialAd';
 import BackButton from '../components/BackButton';
 import LightPathLevelMap from '../components/LightPathLevelMap';
 import LevelCompletePopup from '../components/LevelCompletePopup';
+import FitBox from '../components/FitBox';
 import { LEVEL_FONT } from '../utils/fonts';
 import { useBackHandler } from '../utils/useBackHandler';
 
@@ -600,7 +601,7 @@ export default function LightPathScreen({ onBack }) {
         <View style={s.header}>
           <BackButton onPress={() => { playTap(); onBack(); }} />
         </View>
-        <View style={s.startContent}>
+        <FitBox style={s.startContent} contentStyle={{ width: SW - 60 }}>
           <Text style={[s.title, { textShadowColor: MAGENTA }]}>LIGHT</Text>
           <Text style={[s.title, { color: CYAN, textShadowColor: CYAN, marginTop: -8 }]}>PATH</Text>
           <Text style={s.subtitle}>Turn the mirrors. Light every crystal.</Text>
@@ -612,7 +613,7 @@ export default function LightPathScreen({ onBack }) {
             <Text style={s.progressTxt}>{solvedCount}/{LEVEL_COUNT}</Text>
           </View>
           <NeonButton label="PLAY" color={CYAN} onPress={() => { playTap(); setView('levels'); }} />
-        </View>
+        </FitBox>
       </View>
     );
   }
@@ -748,7 +749,7 @@ const s = StyleSheet.create({
   header: { paddingTop: 50, paddingHorizontal: 20 },
 
   // Start
-  startContent: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30, paddingBottom: 60 },
+  startContent: { paddingHorizontal: 30, paddingTop: 8, paddingBottom: 24 },
   title: {
     fontSize: 64, ...LEVEL_FONT, color: '#FFFFFF', letterSpacing: 4,
     textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 18,

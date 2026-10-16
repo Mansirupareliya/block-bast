@@ -1,8 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  Dimensions, Animated, StatusBar, ScrollView, Image, Pressable,
+  View, TouchableOpacity, StyleSheet, Dimensions, Animated, StatusBar, ScrollView, Image, Pressable,
 } from 'react-native';
+import { Text } from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Rect, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { playTap, playFlip, playMatch, playMismatch, playWin, playLocked } from '../utils/audioManager';
@@ -380,7 +380,7 @@ function FloatingIcon({ icon, size, duration, delay, style }) {
   const rotate = bob.interpolate({ inputRange: [0, 1], outputRange: ['-8deg', '8deg'] });
 
   return (
-    <Animated.Text
+    <Animated.Text allowFontScaling={false}
       style={[style, { fontSize: size, transform: [{ translateY }, { rotate }] }]}
     >
       {icon}
@@ -435,7 +435,7 @@ function PulsingWatermark() {
   const rotate = pulse.interpolate({ inputRange: [0, 1], outputRange: ['15deg', '18deg'] });
 
   return (
-    <Animated.Text style={[startStyles.watermark, { transform: [{ scale }, { rotate }] }]}>
+    <Animated.Text allowFontScaling={false} style={[startStyles.watermark, { transform: [{ scale }, { rotate }] }]}>
       ?
     </Animated.Text>
   );

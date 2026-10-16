@@ -1,8 +1,8 @@
 import React from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  Platform, StatusBar, Animated,
+  View, TouchableOpacity, StyleSheet, Platform, StatusBar, Animated,
 } from 'react-native';
+import { Text } from './AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { playTap } from '../utils/audioManager';
 import { THEME, cartoonShadow } from '../utils/blockBlastTheme';
@@ -99,7 +99,7 @@ export default function GameHeader({
 
         {/* RIGHT — Heart like button */}
         <CartoonButton size={40} onPress={handleLike}>
-          <Animated.Text style={[
+          <Animated.Text allowFontScaling={false} style={[
             styles.heartIcon,
             { color: liked ? '#FFFFFF' : 'rgba(122,74,24,0.55)' },
             { transform: [{ scale: likeScale }] },

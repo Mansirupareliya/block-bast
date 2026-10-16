@@ -1,9 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, Easing } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Animated, Dimensions, Easing } from 'react-native';
+import { Text } from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { playTap, playSuccess } from '../utils/audioManager';
 import { THEME } from '../utils/blockBlastTheme';
 import { maybeShowInterstitial } from '../utils/interstitialAd';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import FitBox from '../components/FitBox';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -104,6 +107,7 @@ export default function GameOverScreen({ score, bestScore, onRestart, onBack }) 
     useRef(new Animated.Value(0)).current,
   ];
   const btnScale = useRef(new Animated.Value(1)).current;
+  const insets = useSafeAreaInsets();
   const glowAnim = useRef(new Animated.Value(0)).current;
 
   const isNewRecord = score > 0 && score >= bestScore;
@@ -144,8 +148,9 @@ export default function GameOverScreen({ score, bestScore, onRestart, onBack }) 
   const cardRotateY = cardRotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '70deg'] });
 
   return (
-    <Animated.View style={[styles.overlay, { opacity: overlayOp }]}>
+    <Animated.View style={[styles.overlay, { opacity: overlayOp, paddingTop: insets.top + 12 }]}>
       {isNewRecord && <Confetti />}
+      <FitBox>
       <Animated.View style={[styles.card, {
         opacity: cardOpacity,
         transform: [{ perspective: 900 }, { rotateY: cardRotateY }, { scale: cardScale }],
@@ -246,6 +251,7 @@ export default function GameOverScreen({ score, bestScore, onRestart, onBack }) 
           )}
         </LinearGradient>
       </Animated.View>
+      </FitBox>
     </Animated.View>
   );
 }
@@ -255,10 +261,11 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(58,28,10,0.6)',
     alignItems: 'center', justifyContent: 'center',
+    paddingBottom: 12,
     zIndex: 10000,
   },
   card: {
-    width: SW * 0.84,
+    width: Math.min(SW * 0.84, 360),
     borderRadius: 28, overflow: 'hidden',
     borderWidth: 3,
     borderColor: 'rgba(122,74,24,0.25)',

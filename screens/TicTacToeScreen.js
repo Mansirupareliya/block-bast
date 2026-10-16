@@ -1,8 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  Dimensions, Animated, StatusBar, Platform, Image, TextInput,
+  View, TouchableOpacity, StyleSheet, Dimensions, Animated, StatusBar, Platform, Image,
 } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { checkWinner, getBestMove } from '../utils/tictactoeAI';
 import { playTap, playMark, playTicTacToeWin } from '../utils/audioManager';

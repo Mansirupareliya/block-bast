@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, Pressable, StyleSheet, Dimensions,
-  StatusBar, Platform, KeyboardAvoidingView, ScrollView, Image, BackHandler, Share,
+  View, TouchableOpacity, Pressable, StyleSheet, Dimensions, StatusBar, Platform, KeyboardAvoidingView, ScrollView, Image, BackHandler, Share,
 } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 import { playTap } from '../utils/audioManager';
 import { getPlayerName, setPlayerName, sanitizeName, getDeviceId, MAX_NAME_LENGTH } from '../utils/playerIdentity';

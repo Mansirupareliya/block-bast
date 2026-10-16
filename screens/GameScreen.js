@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, Dimensions, StatusBar,
-  Platform, Animated, TouchableOpacity,
+  View, StyleSheet, Dimensions, StatusBar, Platform, Animated, TouchableOpacity,
 } from 'react-native';
+import { Text } from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { THEME, cartoonShadow } from '../utils/blockBlastTheme';
 import Board from '../components/Board';
@@ -409,7 +409,7 @@ export default function GameScreen({ onBack }) {
       />
 
       {/* ── Current score large display ── */}
-      <Animated.Text style={[styles.bigScore, { transform: [{ scale: scoreScale }] }]}>
+      <Animated.Text allowFontScaling={false} style={[styles.bigScore, { transform: [{ scale: scoreScale }] }]}>
         {score.toLocaleString()}
       </Animated.Text>
 

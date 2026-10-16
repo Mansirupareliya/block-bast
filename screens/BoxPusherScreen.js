@@ -1,8 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  Dimensions, StatusBar, ScrollView, Animated, Image, Pressable,
+  View, TouchableOpacity, StyleSheet, Dimensions, StatusBar, ScrollView, Animated, Image, Pressable,
 } from 'react-native';
+import { Text } from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Polygon } from 'react-native-svg';
 import { hapticTap, hapticFail } from '../utils/haptics';
@@ -185,7 +185,7 @@ function FloatingIcon({ icon, size, duration, delay, style }) {
   const rotate = bob.interpolate({ inputRange: [0, 1], outputRange: ['-6deg', '6deg'] });
 
   return (
-    <Animated.Text style={[style, { fontSize: size, transform: [{ translateY }, { rotate }] }]}>
+    <Animated.Text allowFontScaling={false} style={[style, { fontSize: size, transform: [{ translateY }, { rotate }] }]}>
       {icon}
     </Animated.Text>
   );

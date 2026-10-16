@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions, Animated, Pressable } from 'react-native';
+import { View, StyleSheet, Dimensions, Animated, Pressable } from 'react-native';
+import { Text } from './AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Polygon, Line, Circle, Ellipse, Rect, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { LEVEL_FONT } from '../utils/fonts';
