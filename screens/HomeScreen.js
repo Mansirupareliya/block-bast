@@ -91,10 +91,11 @@ function GameTile({ game, onPress, liked, onLike, enterAnim }) {
   // Games with a full card artwork (frame + title baked in) show only that
   // image — no info row — with the heart tucked into the frame's corner.
   if (game.cardImage) {
-    // Same height for every card so cards in a row line up; width follows
-    // each artwork's own aspect, capped at the tile width.
-    const imgH = Math.min(CARD_H, TILE_W / game.cardAspect);
-    const imgW = imgH * game.cardAspect;
+    // Every card is drawn in the same box (full tile width x CARD_H) so all
+    // cards on the hub are exactly the same size. The artworks' own aspects
+    // differ only slightly, so stretching them to fit is barely noticeable.
+    const imgH = CARD_H;
+    const imgW = TILE_W;
     const imgTop = (TILE_H - imgH) / 2;
     const imgLeft = (TILE_W - imgW) / 2;
     return (
@@ -106,7 +107,7 @@ function GameTile({ game, onPress, liked, onLike, enterAnim }) {
           activeOpacity={1}
         >
           <Animated.View style={{ width: TILE_W, height: TILE_H, transform: [{ scale: pressScale }] }}>
-            <Image source={game.cardImage} style={{ position: 'absolute', top: imgTop, left: imgLeft, width: imgW, height: imgH }} />
+            <Image source={game.cardImage} resizeMode="stretch" style={{ position: 'absolute', top: imgTop, left: imgLeft, width: imgW, height: imgH }} />
             <TouchableOpacity
               onPress={() => { playTap(); onLike(game.id); }}
               style={[styles.heartBtn, { top: imgTop + imgH * 0.09, right: imgLeft + imgW * 0.11 }]}

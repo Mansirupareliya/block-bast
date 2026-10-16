@@ -42,12 +42,14 @@ export const GAMES = [
     cardAspect: 600 / 716,
   },
   {
-    id: 'dogsblocks',
-    name: 'Dogs Blocks',
+    id: 'lightpath',
+    name: 'Light Path',
     category: 'PUZZLE',
-    accent: '#C68642',
-    gradientColors: ['#F0C080', '#E8A045', '#C68642'],
-    image: require('../assets/dogsblocks_logo.jpg'),
-    disabled: true, // temporarily taken out of rotation — flip back on when ready
+    accent: '#3BE8FF',
+    gradientColors: ['#5A2FB0', '#24124D', '#06040F'],
+    emoji: '🔦',
+    image: require('../assets/lightpath_logo.jpg'),
+    cardImage: require('../assets/lightpath_card.png'), // full card art, 600x650
+    cardAspect: 600 / 650,
   },
 ];

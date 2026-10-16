@@ -8,6 +8,8 @@ import Svg, { Polygon } from 'react-native-svg';
 import { hapticTap, hapticFail } from '../utils/haptics';
 import { playTap, playClick, playSuccess, playLocked } from '../utils/audioManager';
 import { STORAGE_KEYS, loadNumber, saveNumber } from '../utils/storage';
+import { notifyLevelReached } from '../utils/notifications';
+import { maybeAskForRating } from '../utils/rating';
 import { BOXPUSHER_LEVELS } from '../utils/boxPusherLevels';
 import { showInterstitial } from '../utils/interstitialAd';
 import BackButton from '../components/BackButton';
@@ -411,7 +413,7 @@ export default function BoxPusherScreen({ onBack }) {
   const popupAnim = useRef(new Animated.Value(0)).current;
 
   // Restore progress saved on a previous app session — same pattern as
-  // Dogs Blocks / Matchmaker.
+  // Matchmaker.
   useEffect(() => {
     loadNumber(STORAGE_KEYS.BOXPUSHER_MAX_UNLOCKED, 1).then((saved) => {
       if (saved > globalUnlockedLevel) {
@@ -493,6 +495,10 @@ export default function BoxPusherScreen({ onBack }) {
         setComplete(true);
         playSuccess();
         const nextLevel = Math.max(maxUnlockedLevel, levelIdx + 2);
+        if (nextLevel > maxUnlockedLevel && nextLevel <= BOXPUSHER_LEVELS.length) {
+          notifyLevelReached('boxpusher', nextLevel);
+        }
+        maybeAskForRating('boxpusher', nextLevel - 1);
         setMaxUnlockedLevel(nextLevel);
         globalUnlockedLevel = nextLevel;
         saveNumber(STORAGE_KEYS.BOXPUSHER_MAX_UNLOCKED, nextLevel);

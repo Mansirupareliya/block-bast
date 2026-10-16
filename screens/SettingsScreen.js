@@ -13,6 +13,7 @@ import { LEVEL_FONT } from '../utils/fonts';
 import { BADGES, badgeForStreak, liveStreak, subscribeStreak, syncStreak } from '../utils/dailyStreak';
 import { isMusicEnabled, setMusicEnabled, subscribeMusic } from '../utils/backgroundMusic';
 import { isVibrationEnabled, setVibrationEnabled, subscribeVibration } from '../utils/haptics';
+import { isNotificationsEnabled, setNotificationsEnabled, subscribeNotifications } from '../utils/notifications';
 
 const APP_VERSION = require('../app.json').expo.version;
 const { width: SW, height: SH } = Dimensions.get('window');
@@ -44,6 +45,10 @@ function Icon({ name, size = 22, color = '#FFFFFF' }) {
         <Line x1="3" y1="8" x2="3" y2="16" {...p} />
         <Line x1="21" y1="8" x2="21" y2="16" {...p} />
       </>)}
+      {name === 'bell' && (<>
+        <Path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" {...p} />
+        <Path d="M13.73 21a2 2 0 0 1-3.46 0" {...p} />
+      </>)}
       {name === 'edit' && <Path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" {...p} />}
       {name === 'copy' && (<>
         <Rect x="9" y="9" width="13" height="13" rx="2" {...p} />
@@ -64,6 +69,17 @@ function Icon({ name, size = 22, color = '#FFFFFF' }) {
 
 // Chunky 3D candy button: a darker "base" peeks out underneath the face and
 // the face sinks into it while pressed.
+// Game icon for the Favorites lists; games shipped without art (e.g. Light
+// Path) get their accent colour + emoji instead.
+function GameThumb({ game }) {
+  if (game.image) return <Image source={game.image} style={styles.thumb} resizeMode="cover" />;
+  return (
+    <View style={[styles.thumb, { backgroundColor: game.gradientColors?.[1] || game.accent, alignItems: 'center', justifyContent: 'center' }]}>
+      <Text style={{ fontSize: 26 }}>{game.emoji}</Text>
+    </View>
+  );
+}
+
 function ChunkyButton({ face = C.green, base = C.greenDark, onPress, disabled, radius = 22, style, children }) {
   return (
     <Pressable onPress={onPress} disabled={disabled} style={style} hitSlop={4}>
@@ -128,6 +144,7 @@ export default function SettingsScreen({ onBack, onSelect, likes = {}, onToggleL
 
   const musicOn = useSetting(isMusicEnabled, subscribeMusic);
   const vibrateOn = useSetting(isVibrationEnabled, subscribeVibration);
+  const notifyOn = useSetting(isNotificationsEnabled, subscribeNotifications);
 
   useEffect(() => {
     getPlayerName().then((n) => { setName(n); setDraft(n); });
@@ -250,10 +267,11 @@ export default function SettingsScreen({ onBack, onSelect, likes = {}, onToggleL
                   </View>
                 </ChunkyButton>
 
-                {/* Sound / vibration toggles */}
+                {/* Sound / vibration / notification toggles */}
                 <View style={styles.toggleRow}>
                   <RoundToggle icon="music" label="Music" on={musicOn} onToggle={setMusicEnabled} />
                   <RoundToggle icon="vibrate" label="Vibration" on={vibrateOn} onToggle={setVibrationEnabled} />
+                  <RoundToggle icon="bell" label="Alerts" on={notifyOn} onToggle={setNotificationsEnabled} />
                 </View>
 
                 <Text style={styles.version}>{APP_VERSION}</Text>
@@ -300,7 +318,7 @@ export default function SettingsScreen({ onBack, onSelect, likes = {}, onToggleL
                   ) : (
                     favorites.map((g, i) => (
                       <View key={g.id} style={[styles.gameRow, i > 0 && styles.gameRowDivider]}>
-                        <Image source={g.image} style={styles.thumb} resizeMode="cover" />
+                        <GameThumb game={g} />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.gameName}>{g.name}</Text>
                           <Text style={[styles.gameCat, { color: g.accent }]}>{g.category}</Text>
@@ -331,7 +349,7 @@ export default function SettingsScreen({ onBack, onSelect, likes = {}, onToggleL
                           onPress={() => { playTap(); onToggleLike?.(g.id); }}
                           style={[styles.gameRow, i > 0 && styles.gameRowDivider]}
                         >
-                          <Image source={g.image} style={styles.thumb} resizeMode="cover" />
+                          <GameThumb game={g} />
                           <View style={{ flex: 1 }}>
                             <Text style={styles.gameName}>{g.name}</Text>
                             <Text style={[styles.gameCat, { color: g.accent }]}>{g.category}</Text>

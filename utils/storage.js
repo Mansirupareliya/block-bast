@@ -13,14 +13,17 @@ try {
 // every screen reads/writes the exact same string.
 export const STORAGE_KEYS = {
   BLOCKBLAST_BEST_SCORE: '@blockblast:bestScore',
-  DOGSBLOCKS_MAX_UNLOCKED: '@dogsblocks:maxUnlocked',
   MATCHMAKER_MAX_UNLOCKED: '@matchmaker:maxUnlockedLevel',
   MATCHMAKER_BEST_SCORE: '@matchmaker:bestScore',
   BOXPUSHER_MAX_UNLOCKED: '@boxpusher:maxUnlockedLevel',
+  LIGHTPATH_MAX_UNLOCKED: '@lightpath:maxUnlockedLevel',
+  LIGHTPATH_STARS: '@lightpath:bestStars',
   FAVORITES: '@hub:favorites',
   DAILY_STREAK: '@hub:dailyStreak',
   MUSIC_ENABLED: '@hub:musicEnabled',
   VIBRATION_ENABLED: '@hub:vibrationEnabled',
+  NOTIFICATIONS_ENABLED: '@hub:notificationsEnabled',
+  RATING_ASKED: '@hub:ratingAsked',
 };
 
 // Loads a persisted integer, falling back to `fallback` if nothing was ever

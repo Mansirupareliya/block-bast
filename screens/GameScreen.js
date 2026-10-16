@@ -173,7 +173,7 @@ function PauseIcon({ size = 16 }) {
 }
 
 // Kept as an in-session cache (mirrors the same pattern used for level
-// unlocks in DogsBlocksScreen/MemoryMatchScreen) so re-entering this screen
+// unlocks in MemoryMatchScreen/BoxPusherScreen) so re-entering this screen
 // within one app run doesn't flash back to 0 while the persisted value
 // loads from storage.
 let globalBestScore = 0;

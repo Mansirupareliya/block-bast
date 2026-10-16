@@ -7,6 +7,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Rect, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { playTap, playFlip, playMatch, playMismatch, playWin, playLocked } from '../utils/audioManager';
 import { STORAGE_KEYS, loadNumber, saveNumber } from '../utils/storage';
+import { notifyLevelReached } from '../utils/notifications';
+import { maybeAskForRating } from '../utils/rating';
 import { getPlayerName } from '../utils/playerIdentity';
 import { submitProgress } from '../utils/leaderboardService';
 import LeaderboardScreen from './LeaderboardScreen';
@@ -611,6 +613,10 @@ export default function MatchmakerScreen({ onBack }) {
           }
 
           const nextLevel = Math.max(maxUnlockedLevel, cfg.level + 1);
+          if (nextLevel > maxUnlockedLevel && nextLevel <= LEVELS.length) {
+            notifyLevelReached('memorymatch', nextLevel);
+          }
+          maybeAskForRating('memorymatch', nextLevel - 1);
           setMaxUnlockedLevel(nextLevel);
           globalUnlockedLevel = nextLevel;
           saveNumber(STORAGE_KEYS.MATCHMAKER_MAX_UNLOCKED, nextLevel);
