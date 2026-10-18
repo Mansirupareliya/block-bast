@@ -11,7 +11,7 @@ import { STORAGE_KEYS, loadNumber, saveNumber } from '../utils/storage';
 import { notifyLevelReached } from '../utils/notifications';
 import { maybeAskForRating } from '../utils/rating';
 import { BOXPUSHER_LEVELS } from '../utils/boxPusherLevels';
-import { showInterstitial } from '../utils/interstitialAd';
+import { noteLevelComplete, runAfterLevelAd } from '../utils/interstitialAd';
 import BackButton from '../components/BackButton';
 import ArtStartScreen from '../components/ArtStartScreen';
 import { LEVEL_FONT } from '../utils/fonts';
@@ -432,22 +432,24 @@ export default function BoxPusherScreen({ onBack }) {
   }, [complete, popupAnim]);
 
   const startLevel = useCallback((levelNum) => {
-    const idx = levelNum - 1;
-    const lvl = BOXPUSHER_LEVELS[idx];
-    if (!lvl) return;
-    const parsed = parseLevel(lvl.grid);
-    setLevelIdx(idx);
-    setRows(parsed.rows);
-    setCols(parsed.cols);
-    setWalls(parsed.walls);
-    setTargets(parsed.targets);
-    setCrates(parsed.crates);
-    setPlayer(parsed.player);
-    setMoveCount(0);
-    setHistory([]);
-    setComplete(false);
-    setTimeLeft(TIME_LIMIT);
-    setView('game');
+    runAfterLevelAd(() => {
+      const idx = levelNum - 1;
+      const lvl = BOXPUSHER_LEVELS[idx];
+      if (!lvl) return;
+      const parsed = parseLevel(lvl.grid);
+      setLevelIdx(idx);
+      setRows(parsed.rows);
+      setCols(parsed.cols);
+      setWalls(parsed.walls);
+      setTargets(parsed.targets);
+      setCrates(parsed.crates);
+      setPlayer(parsed.player);
+      setMoveCount(0);
+      setHistory([]);
+      setComplete(false);
+      setTimeLeft(TIME_LIMIT);
+      setView('game');
+    });
   }, []);
 
   const resetLevel = useCallback(() => {
@@ -493,6 +495,7 @@ export default function BoxPusherScreen({ onBack }) {
 
       if (sameSet(newCrates, targets)) {
         setComplete(true);
+        noteLevelComplete();
         playSuccess();
         const nextLevel = Math.max(maxUnlockedLevel, levelIdx + 2);
         if (nextLevel > maxUnlockedLevel && nextLevel <= BOXPUSHER_LEVELS.length) {
@@ -690,7 +693,7 @@ export default function BoxPusherScreen({ onBack }) {
           <LinearGradient colors={['#3A5A3E', '#1D2E1F', '#0F1710']} style={StyleSheet.absoluteFill} />
 
           <View style={s.completeTopBar}>
-            <BackButton onPress={() => { playTap(); setView('levels'); showInterstitial(); }} />
+            <BackButton onPress={() => { playTap(); setView('levels'); }} />
           </View>
 
           <View style={s.completeCenter}>

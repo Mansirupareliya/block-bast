@@ -148,6 +148,16 @@ export async function recordPlay() {
   return reward;
 }
 
+// Adds coins won outside the daily streak (e.g. level-complete rewards).
+export async function addCoins(n) {
+  if (!n) return;
+  await loadStreak();
+  state = { ...state, coins: state.coins + n };
+  saveJSON(STORAGE_KEYS.DAILY_STREAK, state);
+  emit();
+  syncToCloud(state);
+}
+
 // The Home header shows a "+N" pop once per payout; this hands it over and
 // clears it so it isn't shown again.
 export function takeLastReward() {

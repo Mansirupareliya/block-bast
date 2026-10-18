@@ -20,11 +20,35 @@ export const DR = [-1, 0, 1, 0];
 export const DC = [0, 1, 0, -1];
 
 export const BEAM_COLORS = {
-  blue: '#4FD4FF',
+  blue: '#FFC93C',
   red: '#FF5FA8',
   green: '#5CFFA0',
 };
 const COLOR_ORDER = ['blue', 'red', 'green'];
+
+// Neon tube colours, in hue order. Each level gets its own set: the main
+// laser takes one colour and the 2nd/3rd lasers (multi-colour levels) take
+// colours 3 and 5 steps further round, so the three always look different.
+const NEON_PALETTE = [
+  '#FFD23C', // gold
+  '#FF7A2E', // orange
+  '#FF3F7F', // hot pink
+  '#FF3FE0', // magenta
+  '#A86BFF', // violet
+  '#3BE8FF', // cyan
+  '#3DFFB8', // mint
+  '#8CFF3F', // lime
+];
+
+export function neonColorsFor(levelNum) {
+  const n = NEON_PALETTE.length;
+  const i = (((levelNum - 1) % n) + n) % n;
+  return {
+    blue: NEON_PALETTE[i],
+    red: NEON_PALETTE[(i + 3) % n],
+    green: NEON_PALETTE[(i + 5) % n],
+  };
+}
 
 // Cell types. Mirrors and splitters have an orientation: '/' or '\'.
 //   { type: 'source',   dir, color }

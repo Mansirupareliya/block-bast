@@ -13,7 +13,7 @@ import { getPlayerName } from '../utils/playerIdentity';
 import { submitProgress } from '../utils/leaderboardService';
 import LeaderboardScreen from './LeaderboardScreen';
 import AdBanner from '../components/AdBanner';
-import { showInterstitial } from '../utils/interstitialAd';
+import { showInterstitial, noteLevelComplete, runAfterLevelAd } from '../utils/interstitialAd';
 import BackButton from '../components/BackButton';
 import ImageButton from '../components/ImageButton';
 import ArtStartScreen from '../components/ArtStartScreen';
@@ -532,16 +532,18 @@ export default function MatchmakerScreen({ onBack }) {
   const cfg = LEVELS[currentLevelIdx] || LEVELS[0];
 
   const startLevel = useCallback((levelNum) => {
-    const idx = levelNum - 1;
-    const lcfg = LEVELS[idx];
-    const deck = buildDeck(lcfg.pairs, lcfg.theme, lcfg.bonusTile);
-    setCurrentLevelIdx(idx);
-    setCards(deck);
-    cardAnims.current = deck.map(() => new Animated.Value(1));
-    setSelected([]); selectedRef.current = []; hintPairRef.current = null; setCanFlip(true);
-    setMatched(0); setScore(0);
-    setComplete(false);
-    setView('game');
+    runAfterLevelAd(() => {
+      const idx = levelNum - 1;
+      const lcfg = LEVELS[idx];
+      const deck = buildDeck(lcfg.pairs, lcfg.theme, lcfg.bonusTile);
+      setCurrentLevelIdx(idx);
+      setCards(deck);
+      cardAnims.current = deck.map(() => new Animated.Value(1));
+      setSelected([]); selectedRef.current = []; hintPairRef.current = null; setCanFlip(true);
+      setMatched(0); setScore(0);
+      setComplete(false);
+      setView('game');
+    });
   }, []);
 
   // Quick "unfold" from a thin sliver — the new face is already set when
@@ -603,6 +605,7 @@ export default function MatchmakerScreen({ onBack }) {
         // Check win
         if (matched + 1 >= cfg.pairs) {
           setComplete(true);
+          noteLevelComplete();
           playWin();
 
           const finalScore = score + 50;
@@ -864,7 +867,7 @@ export default function MatchmakerScreen({ onBack }) {
               <Text style={gameStyles.pillIcon}>🏆</Text>
               <Text style={gameStyles.coinPillTxt}>{bestScore}</Text>
             </View>
-            <TouchableOpacity style={gameStyles.closeBtn} onPress={() => { playTap(); setView('levels'); showInterstitial(); }}>
+            <TouchableOpacity style={gameStyles.closeBtn} onPress={() => { playTap(); setView('levels'); }}>
               <Text style={gameStyles.closeBtnTxt}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -883,7 +886,7 @@ export default function MatchmakerScreen({ onBack }) {
             </View>
 
             <View style={gameStyles.navRow}>
-              <TouchableOpacity style={gameStyles.navBtn} onPress={() => { playTap(); setView('levels'); showInterstitial(); }}>
+              <TouchableOpacity style={gameStyles.navBtn} onPress={() => { playTap(); setView('levels'); }}>
                 <Text style={gameStyles.navBtnTxt}>«  Back</Text>
               </TouchableOpacity>
               {!isLastLevel && (

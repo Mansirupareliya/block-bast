@@ -65,6 +65,7 @@ export function preloadInterstitial() {
 export function showInterstitial(onDone) {
   if (interstitial && isLoaded) {
     isLoaded = false;
+    levelsSinceAd = 0; // any ad shown restarts the every-3-levels count
     onClosedOnce = onDone || null;
     interstitial.show().catch((e) => {
       console.warn('[interstitialAd] failed to show:', e);
@@ -76,6 +77,23 @@ export function showInterstitial(onDone) {
   load();
   onDone?.();
   return false;
+}
+
+// Level games (Matchmaker, Box Pusher, Light Path): after every 3 levels
+// completed — counted across all games this session — the next level the
+// player starts opens behind a full-screen ad.
+const LEVELS_PER_AD = 3;
+let levelsSinceAd = 0;
+
+export function noteLevelComplete() {
+  levelsSinceAd += 1;
+}
+
+// Wraps starting a level: runs `start` straight away, or after the ad
+// closes when 3 levels have been completed since the last ad.
+export function runAfterLevelAd(start) {
+  if (levelsSinceAd >= LEVELS_PER_AD) showInterstitial(start);
+  else start();
 }
 
 // Block Puzzle game-over: roughly every other run, so the very first run of

@@ -10,7 +10,7 @@ import BoxPusherScreen   from './screens/BoxPusherScreen';
 import LightPathScreen   from './screens/LightPathScreen';
 import SettingsScreen    from './screens/SettingsScreen';
 import AdBanner          from './components/AdBanner';
-import { preloadInterstitial, showInterstitial } from './utils/interstitialAd';
+import { preloadInterstitial } from './utils/interstitialAd';
 import { STORAGE_KEYS, loadJSON, saveJSON } from './utils/storage';
 import { GAMES } from './utils/games';
 import { loadStreak, recordPlay } from './utils/dailyStreak';
@@ -42,10 +42,9 @@ export default function App() {
     });
   };
 
-  // Leaving Block Puzzle, Matchmaker or Box Pusher for Home (on-screen back
-  // button or phone back) shows a full-screen ad over Home. Switch first so a
-  // second back press while the ad loads can't fire this twice.
-  const leaveGameWithAd = () => { setScreen('home'); showInterstitial(); };
+  // Back buttons never show ads; ads come after every 3 completed levels
+  // (see runAfterLevelAd).
+  const goHome = () => setScreen('home');
 
   useEffect(() => { loadStreak(); initMusic(); initNotifications(); }, []);
 
@@ -71,11 +70,11 @@ export default function App() {
     <SafeAreaProvider style={styles.root}>
       <View style={styles.root}>
         {screen === 'home'        && <HomeScreen        onSelect={setScreen} likes={likes} onToggleLike={toggleLike} />}
-        {screen === 'blockblast'  && <GameScreen         onBack={leaveGameWithAd} />}
+        {screen === 'blockblast'  && <GameScreen         onBack={goHome} />}
         {screen === 'tictactoe'   && <TicTacToeScreen    onBack={() => setScreen('home')} />}
-        {screen === 'memorymatch' && <MemoryMatchScreen  onBack={leaveGameWithAd} />}
-        {screen === 'boxpusher'   && <BoxPusherScreen    onBack={leaveGameWithAd} />}
-        {screen === 'lightpath'   && <LightPathScreen    onBack={leaveGameWithAd} />}
+        {screen === 'memorymatch' && <MemoryMatchScreen  onBack={goHome} />}
+        {screen === 'boxpusher'   && <BoxPusherScreen    onBack={goHome} />}
+        {screen === 'lightpath'   && <LightPathScreen    onBack={() => setScreen('home')} />}
         {screen === 'settings'    && <SettingsScreen     onBack={() => setScreen('home')} onSelect={setScreen} likes={likes} onToggleLike={toggleLike} />}
       </View>
       {GAMES_WITH_BANNER.includes(screen) && <AdBanner />}
