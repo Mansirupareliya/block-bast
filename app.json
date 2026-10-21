@@ -8,7 +8,7 @@
     "splash": {
       "image": "./assets/app_logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0B1A33"
+      "backgroundColor": "#0B2540"
     },
     "userInterfaceStyle": "light",
     "ios": {
@@ -21,7 +21,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/app_icon_foreground.png",
-        "backgroundColor": "#081F37"
+        "backgroundColor": "#0B2540"
       },
       "package": "com.mansirupareliyasteam.BlockBlast",
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.mansirupareliyasteam.BlockBlast",

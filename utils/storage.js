@@ -23,6 +23,7 @@ export const STORAGE_KEYS = {
   MUSIC_ENABLED: '@hub:musicEnabled',
   VIBRATION_ENABLED: '@hub:vibrationEnabled',
   NOTIFICATIONS_ENABLED: '@hub:notificationsEnabled',
+  REMINDER_PROGRESS: '@hub:reminderProgress',
   RATING_ASKED: '@hub:ratingAsked',
 };
 

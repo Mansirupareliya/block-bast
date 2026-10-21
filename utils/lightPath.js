@@ -5,13 +5,18 @@
 // install. The generator first lays out a *solved* board — it walks each
 // laser across the grid, dropping mirrors where the beam turns and a crystal
 // where it ends — then scrambles the tappable mirrors. That way every level
-// is guaranteed solvable. Decoy mirrors that no beam needs are then
-// scattered off the path to mislead.
+// is guaranteed solvable. Then it adds the traps that make it hard:
+//   - false trails: turning a path mirror the wrong way sends the beam down
+//     a believable route of decoy mirrors that ends at a dead end or a bomb,
+//     so every turn is a real decision and a wrong guess costs several taps;
+//   - loose decoy mirrors, walls and bombs scattered off the path.
 //
 // In play, a mirror only passes the laser once the player has tapped it
-// ("switched it on"); the first tap switches it on without turning it, later
-// taps turn it. So every path mirror costs one tap, plus one more if it was
-// knocked out of place — that total is the level's "par" for the stars.
+// ("switched it on") — locked mirrors too; the laser never runs through a
+// mirror on its own. The first tap switches a mirror on without turning it,
+// later taps turn it (locked ones can't turn). So every path mirror costs one
+// tap, plus one more if it was knocked out of place — that total is the
+// level's "par" for the stars.
 
 export const LEVEL_COUNT = 200;
 
@@ -66,12 +71,12 @@ export function reflect(o, d) {
 // The level number at which each mechanic first appears (shown as a tip).
 export const MECHANIC_TIPS = [
   { level: 1, text: 'Tap a mirror to switch it on, tap again to turn it. Guide the laser into the crystal!' },
-  { level: 3, text: 'Careful: not every mirror is on the path!' },
-  { level: 12, text: 'Mirrors with bolts are locked. Plan around them.' },
-  { level: 25, text: 'Glass splitters let the beam pass through AND reflect.' },
-  { level: 40, text: 'Two lasers! Each crystal only lights up in its own colour.' },
-  { level: 60, text: "Watch out: don't let any laser hit a bomb!" },
-  { level: 100, text: 'Three lasers. Good luck, laser master!' },
+  { level: 3, text: 'Careful: a wrong turn can lead down a fake trail of mirrors. Think before you tap!' },
+  { level: 10, text: "Mirrors with bolts are locked: tap to switch them on, but they won't turn." },
+  { level: 18, text: 'Glass splitters let the beam pass through AND reflect.' },
+  { level: 25, text: 'Two lasers! Each crystal only lights up in its own colour.' },
+  { level: 30, text: "Watch out: don't let any laser hit a bomb!" },
+  { level: 70, text: 'Three lasers. Good luck, laser master!' },
 ];
 
 export function tipForLevel(levelNum) {
@@ -182,22 +187,29 @@ export function cloneGrid(grid) {
 }
 
 // ── Difficulty curve ──────────────────────────────────────────────────────
+// Ramps quickly: full 9x9 boards by level 61, more turns per laser, false
+// trails on most turns, and few locked mirrors (they give the answer away).
 function settingsFor(level) {
-  const size = level <= 8 ? 5 : level <= 24 ? 6 : level <= 55 ? 7 : level <= 110 ? 8 : 9;
-  const lasers = level < 40 ? 1 : level < 100 ? 2 : 3;
-  // Turns per laser grows slowly; extra lasers each get a little less so
-  // big boards don't become a wall of mirrors.
-  const turnsBase = Math.min(2 + Math.floor(level / 6), 7);
-  const turns = lasers === 1 ? turnsBase : Math.max(2, turnsBase - lasers + 1);
+  const size = level <= 4 ? 5 : level <= 12 ? 6 : level <= 30 ? 7 : level <= 60 ? 8 : 9;
+  const lasers = level < 25 ? 1 : level < 70 ? 2 : 3;
+  const turnsBase = Math.min(3 + Math.floor(level / 5), 10);
+  // Each extra laser takes two turns off the others so big boards still fit.
+  const turns = Math.max(3, turnsBase - 2 * (lasers - 1));
   return {
     size,
     lasers,
     turns,
-    splitChance: level >= 25 ? Math.min(0.15 + (level - 25) * 0.004, 0.45) : 0,
-    fixedChance: level >= 12 ? 0.3 : 0,
-    walls: level >= 5 ? Math.min(1 + Math.floor(level / 20), 6) : 0,
-    mines: level >= 60 ? Math.min(1 + Math.floor((level - 60) / 30), 4) : 0,
-    decoys: level >= 3 ? Math.min(1 + Math.floor(level / 6), Math.floor((size * size) / 5)) : 0,
+    splitChance: level >= 18 ? Math.min(0.18 + (level - 18) * 0.004, 0.45) : 0,
+    fixedChance: level >= 10 ? 0.15 : 0,
+    walls: level >= 4 ? Math.min(2 + Math.floor(level / 15), 8) : 0,
+    mines: level >= 30 ? Math.min(1 + Math.floor((level - 30) / 20), 5) : 0,
+    // Chance that a path mirror gets a false trail behind its wrong turn,
+    // and how many turns that trail may take.
+    trailChance: level >= 3 ? Math.min(0.4 + level * 0.01, 0.95) : 0,
+    trailTurns: Math.min(1 + Math.floor(level / 20), 4),
+    // A share of false trails end in a bomb once bombs are introduced.
+    trailMineChance: level >= 30 ? 0.35 : 0,
+    decoys: level >= 2 ? Math.min(2 + Math.floor(level / 5), Math.floor((size * size) / 4)) : 0,
   };
 }
 
@@ -207,6 +219,7 @@ function tryBuild(level, rng, cfg) {
   const grid = Array.from({ length: n }, () => Array(n).fill(null));
   const path = new Set(); // cells some beam passes through in the solution
   const pathPieces = []; // [r, c] of mirrors/splitters on the solution path
+  const wrongTurns = []; // [r, c, heading] a path mirror sends the beam when wrong
   const inB = (r, c) => r >= 0 && c >= 0 && r < n && c < n;
   const k = (r, c) => `${r},${c}`;
   const pick = (arr) => arr[Math.floor(rng() * arr.length)];
@@ -254,6 +267,8 @@ function tryBuild(level, rng, cfg) {
       }
       grid[pr][pc] = { type: 'mirror', o, fixed: false };
       pathPieces.push([pr, pc]);
+      // Turned the wrong way, this mirror sends the beam the opposite way.
+      wrongTurns.push([pr, pc, (turnDir + 2) % 4]);
       r = pr; c = pc; d = turnDir;
     }
     return false;
@@ -294,12 +309,42 @@ function tryBuild(level, rng, cfg) {
       grid[r][c] = make();
     }
   };
+  // False trails: from each path mirror's wrong turn, lay a short route of
+  // decoy mirrors (each turned at random, like the real ones) so the wrong
+  // choice looks just as promising as the right one. It ends wherever its
+  // last run goes (edge, wall, another piece), sometimes at a bomb.
+  const trail = (r, c, d, turns) => {
+    for (let t = 0; t <= turns; t++) {
+      const room = [];
+      let rr = r, cc = c;
+      while (true) {
+        rr += DR[d]; cc += DC[d];
+        if (!inB(rr, cc) || grid[rr][cc]) break;
+        room.push([rr, cc]);
+      }
+      const stops = room.map((p, i) => i).filter((i) => free(room[i][0], room[i][1]));
+      if (!stops.length) return;
+      const [pr, pc] = room[pick(stops)];
+      if (t === turns) {
+        if (rng() < cfg.trailMineChance) grid[pr][pc] = { type: 'mine' };
+        return;
+      }
+      const turnDir = rng() < 0.5 ? (d + 1) % 4 : (d + 3) % 4;
+      const o = reflect('/', d) === turnDir ? '/' : '\\';
+      grid[pr][pc] = { type: 'mirror', o: rng() < 0.5 ? o : (o === '/' ? '\\' : '/'), fixed: false };
+      r = pr; c = pc; d = turnDir;
+    }
+  };
+  for (const [r, c, d] of wrongTurns) {
+    if (rng() < cfg.trailChance) trail(r, c, d, 1 + Math.floor(rng() * cfg.trailTurns));
+  }
+
   place(cfg.walls, () => ({ type: 'wall' }));
   place(cfg.mines, () => ({ type: 'mine' }));
   place(cfg.decoys, () => ({
     type: rng() < cfg.splitChance / 2 ? 'splitter' : 'mirror',
     o: rng() < 0.5 ? '/' : '\\',
-    fixed: rng() < cfg.fixedChance / 2,
+    fixed: rng() < cfg.fixedChance,
   }));
 
   // Lock some solution mirrors in their correct orientation.
@@ -311,18 +356,18 @@ function tryBuild(level, rng, cfg) {
   if (!movable.length) return null;
 
   // Scramble: knock movable solution mirrors out of place (at least one,
-  // usually most). Par = one tap to switch on each movable path mirror, plus
-  // one to turn each scrambled one.
-  let par = movable.length;
+  // usually most). Par = one tap to switch on each path mirror (locked ones
+  // included), plus one to turn each scrambled one.
+  let par = pathPieces.length;
   movable.forEach(([r, c], i) => {
-    if (i === 0 || rng() < 0.75) {
+    if (i === 0 || rng() < 0.85) {
       grid[r][c].o = grid[r][c].o === '/' ? '\\' : '/';
       par++;
     }
   });
   if (isSolved(grid)) return null;
-  // Before any tap only locked mirrors pass light; no crystal may be lit yet.
-  if (traceBeams(grid, { isActive: (r, c, cell) => cell.fixed }).lit.size) return null;
+  // Before any tap no mirror passes light; no crystal may be lit yet.
+  if (traceBeams(grid, { isActive: () => false }).lit.size) return null;
 
   return { size: n, grid, solution, par };
 }
@@ -336,7 +381,7 @@ export function getLevel(levelNum) {
   for (let attempt = 0; attempt < 400 && !level; attempt++) {
     const rng = makeRng(levelNum * 7919 + attempt * 104729 + 17);
     // If a big config keeps failing, ease off the turn count a step at a time.
-    const ease = Math.floor(attempt / 100);
+    const ease = Math.floor(attempt / 50);
     const eased = ease ? { ...cfg, turns: Math.max(2, cfg.turns - ease) } : cfg;
     level = tryBuild(levelNum, rng, eased);
   }
@@ -346,6 +391,6 @@ export function getLevel(levelNum) {
 
 // Star rating from taps vs par. Using a hint caps it at 2 stars.
 export function starsFor(taps, par, usedHint) {
-  const stars = taps <= par ? 3 : taps <= par + 4 ? 2 : 1;
+  const stars = taps <= par ? 3 : taps <= par + 2 ? 2 : 1;
   return usedHint ? Math.min(stars, 2) : stars;
 }

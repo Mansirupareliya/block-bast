@@ -228,8 +228,8 @@ function Cell({ cell, size, lit, active, isMineHit, isHint, pulse, onPress }) {
           <>
             <TileOutline
               cs={size}
-              fill={cell.fixed ? 'rgba(20,10,3,0.28)' : active ? 'rgba(255,200,90,0.25)' : 'rgba(255,215,150,0.08)'}
-              line={cell.fixed ? 'rgba(200,170,130,0.4)' : active ? AMBER : 'rgba(245,205,150,0.65)'}
+              fill={active ? 'rgba(255,200,90,0.25)' : cell.fixed ? 'rgba(20,10,3,0.28)' : 'rgba(255,215,150,0.08)'}
+              line={active ? AMBER : cell.fixed ? 'rgba(200,170,130,0.4)' : 'rgba(245,205,150,0.65)'}
               dots={cell.fixed ? 'rgba(220,190,150,0.7)' : null}
             />
             <View style={StyleSheet.absoluteFill}>
@@ -483,7 +483,7 @@ export default function LightPathScreen({ onBack }) {
   // the player's first mirror tap, so the start of a level doesn't give the
   // path away.
   const fullTrace = useMemo(() => (grid ? traceBeams(grid, {
-    isActive: (r, c, cell) => cell.fixed || active.has(`${r},${c}`),
+    isActive: (r, c) => active.has(`${r},${c}`),
     hideDeadEnds: true,
   }) : null), [grid, active]);
   const trace = fullTrace && !beamOn ? NO_BEAM : fullTrace;
@@ -543,12 +543,13 @@ export default function LightPathScreen({ onBack }) {
     if (complete || solved || !grid) return;
     const cell = grid[r][c];
     if (!cell || (cell.type !== 'mirror' && cell.type !== 'splitter')) return;
-    if (cell.fixed) { playLocked(); return; }
-    playClick();
-    setBeamOn(true);
     // First tap switches the mirror on as it stands; later taps turn it.
+    // Locked mirrors switch on too, but can't be turned.
     const key = `${r},${c}`;
     const kind = active.has(key) ? 'turn' : 'on';
+    if (cell.fixed && kind === 'turn') { playLocked(); return; }
+    playClick();
+    setBeamOn(true);
     if (kind === 'on') setActive((a) => new Set(a).add(key));
     else setGrid((g) => flip(g, r, c));
     setTaps((t) => t + 1);
@@ -578,7 +579,7 @@ export default function LightPathScreen({ onBack }) {
       for (let c = 0; c < n; c++) {
         const want = level.solution[r][c];
         const have = grid[r][c];
-        if (!want || !have || (want.type !== 'mirror' && want.type !== 'splitter') || have.fixed) continue;
+        if (!want || !have || (want.type !== 'mirror' && want.type !== 'splitter')) continue;
         if (want.o !== have.o || !active.has(`${r},${c}`)) {
           playTap();
           setBeamOn(true);
