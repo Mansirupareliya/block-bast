@@ -17,7 +17,7 @@ import BackButton from '../components/BackButton';
 import LightPathLevelMap, { Planks } from '../components/LightPathLevelMap';
 import LightPathLoading from '../components/LightPathLoading';
 import LightPathComplete from '../components/LightPathComplete';
-import { noteLevelComplete, runAfterLevelAd } from '../utils/interstitialAd';
+import { showInterstitial, noteLevelComplete, runAfterLevelAd } from '../utils/interstitialAd';
 import { LEVEL_FONT } from '../utils/fonts';
 import { useBackHandler } from '../utils/useBackHandler';
 
@@ -572,7 +572,7 @@ export default function LightPathScreen({ onBack }) {
 
   // Hint: fix one path mirror that's wrongly turned or not switched on yet,
   // and flash it. Caps the level at 2 stars.
-  const hint = useCallback(() => {
+  const revealHint = useCallback(() => {
     if (complete || solved || !grid || !level) return;
     const n = grid.length;
     for (let r = 0; r < n; r++) {
@@ -593,6 +593,18 @@ export default function LightPathScreen({ onBack }) {
       }
     }
   }, [complete, solved, grid, level, active]);
+
+  // Show an ad first; reveal the hint once it closes (or right away if no
+  // ad was ready). The ref stops double-taps from queuing a second ad.
+  const hintPending = useRef(false);
+  const hint = useCallback(() => {
+    if (hintPending.current || complete || solved || !grid || !level) return;
+    hintPending.current = true;
+    showInterstitial(() => {
+      hintPending.current = false;
+      revealHint();
+    });
+  }, [complete, solved, grid, level, revealHint]);
 
   const restart = useCallback(() => { playTap(); startLevel(levelNum); }, [levelNum, startLevel]);
 
