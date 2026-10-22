@@ -7,7 +7,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_USE_TEST_ADS": "true"
+        "EXPO_PUBLIC_USE_TEST_ADS": "false"
       }
     },
     "preview": {
