@@ -21,7 +21,8 @@
     },
     "production": {
       "env": {
-        "EXPO_PUBLIC_USE_TEST_ADS": "false"
+        "EXPO_PUBLIC_USE_TEST_ADS": "false",
+        "autoIncrement": true
       }
     }
   },
