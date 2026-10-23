@@ -2,7 +2,7 @@
   "expo": {
     "name": "Offline Game Puzzles",
     "slug": "BlockBlast",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/app_icon.png",
     "splash": {
@@ -24,6 +24,7 @@
         "backgroundColor": "#0B2540"
       },
       "package": "com.mansirupareliyasteam.BlockBlast",
+      "versionCode": 2,
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.mansirupareliyasteam.BlockBlast",
       "permissions": [
         "android.permission.MODIFY_AUDIO_SETTINGS",
