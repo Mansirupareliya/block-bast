@@ -15,7 +15,8 @@ import { playTap, playWin } from '../utils/audioManager';
 // orange ribbon banner, the stars earned, a total-stars progress card, and a
 // coin reward. A pointer slides along a multiplier bar; the green button
 // stops it, shows an ad and pays base x multiplier, the orange one pays the
-// base coins. Either then moves on (onNext).
+// base coins. Either then moves on (onNext). The blue Next Level button also
+// pays the base coins and moves on, for players who skip the reward choice.
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const COIN_IMG = require('../assets/coin.png');
@@ -194,11 +195,11 @@ function MultiplierBar({ pos }) {
 }
 
 // Chunky 3D reward button: darker base under a glossy face.
-function RewardButton({ colors, base, onPress, disabled, children }) {
+function RewardButton({ colors, base, onPress, disabled, style, children }) {
   return (
     <Pressable onPress={onPress} disabled={disabled}>
       {({ pressed }) => (
-        <View style={[st.btnWrap, disabled && { opacity: 0.6 }]}>
+        <View style={[st.btnWrap, style, disabled && { opacity: 0.6 }]}>
           <View style={[st.btnBase, { backgroundColor: base }]} />
           <LinearGradient colors={colors} style={[st.btnFace, { borderColor: base, transform: [{ translateY: pressed ? 4 : 0 }] }]}>
             <View style={st.btnShine} />
@@ -210,7 +211,7 @@ function RewardButton({ colors, base, onPress, disabled, children }) {
   );
 }
 
-export default function LightPathComplete({ levelNum, stars, totalStars, maxStars, onNext, onReplay, onHome }) {
+export default function LightPathComplete({ levelNum, stars, totalStars, maxStars, isLast, onNext, onReplay, onHome }) {
   const [coins, setCoins] = useState(0);
   const [busy, setBusy] = useState(false);
   const [mult, setMult] = useState(null); // multiplier the pointer stopped on
@@ -313,6 +314,12 @@ export default function LightPathComplete({ levelNum, stars, totalStars, maxStar
             <Image source={COIN_IMG} style={st.btnCoin} />
           </RewardButton>
         </View>
+        <View style={{ marginTop: 14 }}>
+          <RewardButton colors={['#5CC8FF', '#2D9CFF', '#1A7FE0']} base="#0F5BA8" onPress={claimBase} disabled={busy} style={st.nextBtn}>
+            <OutlinedText text={isLast ? 'ALL LEVELS' : 'NEXT LEVEL'} width={160} height={44} size={24} outline="#0F4C8A" strokeWidth={5} />
+            <Svg width={18} height={18} style={{ marginLeft: 4 }}><Polygon points="3,1 17,9 3,17" fill="#FFFFFF" stroke="#0F4C8A" strokeWidth={2} strokeLinejoin="round" /></Svg>
+          </RewardButton>
+        </View>
         <Pressable onPress={() => { if (!busy) { playTap(); onReplay(); } }} hitSlop={10}>
           <Text style={st.replayTxt}>↻ Replay level</Text>
         </Pressable>
@@ -338,7 +345,7 @@ const st = StyleSheet.create({
   coinIcon: { width: 40, height: 40, marginLeft: -10, marginRight: 4 },
   coinPillTxt: { ...LEVEL_FONT, fontSize: 20, color: '#FFFFFF', flex: 1, textAlign: 'right' },
 
-  center: { alignItems: 'center', marginTop: SH * 0.06 },
+  center: { alignItems: 'center', marginTop: SH * 0.03 },
   starsRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4, marginBottom: 18 },
 
   card: {
@@ -357,7 +364,7 @@ const st = StyleSheet.create({
     backgroundColor: '#2C2466', borderWidth: 6, borderColor: '#7468E8',
   },
 
-  bottom: { position: 'absolute', left: 0, right: 0, bottom: SH * 0.07, alignItems: 'center' },
+  bottom: { position: 'absolute', left: 0, right: 0, bottom: SH * 0.04, alignItems: 'center' },
   barOuter: {
     width: BAR_W + 12, height: 56, borderRadius: 28, padding: 6, backgroundColor: '#FFF4EA',
     shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 5, shadowOffset: { width: 0, height: 3 }, elevation: 5,
@@ -366,7 +373,7 @@ const st = StyleSheet.create({
   seg: { width: SEG_W, alignItems: 'center', justifyContent: 'center' },
   pointer: { position: 'absolute', top: -20, left: 6 - 17 },
 
-  btnRowOuter: { flexDirection: 'row', gap: 22, marginTop: 30 },
+  btnRowOuter: { flexDirection: 'row', gap: 22, marginTop: 26 },
   btnWrap: { width: Math.min((SW - 70) / 2, 170), height: 64 },
   btnBase: { position: 'absolute', left: 0, right: 0, top: 6, height: 58, borderRadius: 22 },
   btnFace: {
@@ -383,5 +390,6 @@ const st = StyleSheet.create({
     width: 26, height: 26, borderRadius: 5, marginLeft: 8, alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#F4FFE8', borderWidth: 2, borderColor: '#3D7A16',
   },
-  replayTxt: { ...LEVEL_FONT, fontSize: 16, color: '#8A6A5A', marginTop: 18 },
+  nextBtn: { width: Math.min((SW - 70) / 2, 170) * 2 + 22 },
+  replayTxt: { ...LEVEL_FONT, fontSize: 16, color: '#8A6A5A', marginTop: 12 },
 });

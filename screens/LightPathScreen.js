@@ -743,6 +743,7 @@ export default function LightPathScreen({ onBack }) {
           stars={earned}
           totalStars={Object.values(bestStars).reduce((sum, v) => sum + v, 0)}
           maxStars={LEVEL_COUNT * 3}
+          isLast={isLast}
           onNext={() => { if (isLast) setView('levels'); else startLevel(levelNum + 1); }}
           onReplay={restart}
           onHome={() => setView('levels')}
