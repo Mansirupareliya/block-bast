@@ -8,6 +8,7 @@ import { Text } from '../components/AppText';
 import BackButton from '../components/BackButton';
 import ColorConnectBoard from '../components/ColorConnectBoard';
 import ColorConnectComplete from '../components/ColorConnectComplete';
+import ColorConnectLoading from '../components/ColorConnectLoading';
 import {
   makeLevel, tierFor, emptyPaths, beginDrag, extendDrag, applyDrag, tidy, isConnected,
   progressOf, validateBoard, applyHint,
@@ -147,7 +148,7 @@ function LevelTile({ num, state, perfect, onPress }) {
 
 // ── Main screen ───────────────────────────────────────────────────────────
 export default function ColorConnectScreen({ onBack }) {
-  const [view, setView] = useState('menu'); // 'menu' | 'levels' | 'game'
+  const [view, setView] = useState('loading'); // 'loading' | 'menu' | 'levels' | 'game'
   const [maxUnlocked, setMaxUnlocked] = useState(globalUnlocked);
   const [solved, setSolved] = useState({}); // { [levelNum]: 1 solved | 2 perfect }
 
@@ -365,6 +366,11 @@ export default function ColorConnectScreen({ onBack }) {
 
   const solvedCount = Object.keys(solved).length;
   const continueLevel = Math.min(maxUnlocked, LEVEL_COUNT);
+
+  const onLoaded = useCallback(() => setView('menu'), []);
+
+  // ── Loading splash ──────────────────────────────────────────────────────
+  if (view === 'loading') return <ColorConnectLoading onDone={onLoaded} />;
 
   // ── Menu ────────────────────────────────────────────────────────────────
   if (view === 'menu') {

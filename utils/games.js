@@ -59,6 +59,8 @@ export const GAMES = [
     accent: '#2CC9BF',
     gradientColors: ['#2CC9BF', '#139AA0', '#0B6A78'],
     emoji: '🔴',
-    logoLabel: 'COLOR CONNECT', // no card art yet: gradient + emoji + title badge
+    image: require('../assets/colorconnect_card.png'),
+    cardImage: require('../assets/colorconnect_card.png'), // full card art, 600x714
+    cardAspect: 600 / 714,
   },
 ];
