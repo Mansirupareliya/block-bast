@@ -8,6 +8,7 @@ import TicTacToeScreen   from './screens/TicTacToeScreen';
 import MemoryMatchScreen from './screens/MemoryMatchScreen';
 import BoxPusherScreen   from './screens/BoxPusherScreen';
 import LightPathScreen   from './screens/LightPathScreen';
+import ColorConnectScreen from './screens/ColorConnectScreen';
 import SettingsScreen    from './screens/SettingsScreen';
 import AdBanner          from './components/AdBanner';
 import { preloadInterstitial } from './utils/interstitialAd';
@@ -21,7 +22,7 @@ import { FONT_FILES } from './utils/fonts';
 
 // Every game gets a banner pinned under it. Home places its own banner and
 // Matchmaker places one under its board, so they're not listed here.
-const GAMES_WITH_BANNER = ['blockblast', 'tictactoe', 'boxpusher', 'lightpath'];
+const GAMES_WITH_BANNER = ['blockblast', 'tictactoe', 'boxpusher', 'lightpath', 'colorconnect'];
 
 export default function App() {
   const [screen, setScreen] = useState('home');
@@ -75,6 +76,7 @@ export default function App() {
         {screen === 'memorymatch' && <MemoryMatchScreen  onBack={goHome} />}
         {screen === 'boxpusher'   && <BoxPusherScreen    onBack={goHome} />}
         {screen === 'lightpath'   && <LightPathScreen    onBack={() => setScreen('home')} />}
+        {screen === 'colorconnect' && <ColorConnectScreen onBack={goHome} />}
         {screen === 'settings'    && <SettingsScreen     onBack={() => setScreen('home')} onSelect={setScreen} likes={likes} onToggleLike={toggleLike} />}
       </View>
       {GAMES_WITH_BANNER.includes(screen) && <AdBanner />}

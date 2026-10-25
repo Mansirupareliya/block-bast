@@ -52,4 +52,13 @@ export const GAMES = [
     cardImage: require('../assets/lightpath_card.png'), // full card art, 600x650
     cardAspect: 600 / 650,
   },
+  {
+    id: 'colorconnect',
+    name: 'Color Connect',
+    category: 'PUZZLE',
+    accent: '#2CC9BF',
+    gradientColors: ['#2CC9BF', '#139AA0', '#0B6A78'],
+    emoji: '🔴',
+    logoLabel: 'COLOR CONNECT', // no card art yet: gradient + emoji + title badge
+  },
 ];
