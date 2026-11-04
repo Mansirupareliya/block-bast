@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { View, PanResponder, Animated, Easing, StyleSheet } from 'react-native';
-import Svg, { Rect, Line, Circle, Polyline, Defs, RadialGradient, Stop } from 'react-native-svg';
+import { View, Image, PanResponder, Animated, Easing, StyleSheet } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { DOT_COLORS, walkBetween, isConnected } from '../utils/colorConnect';
+import { DOT_IMAGES, NEON_CELL } from '../utils/colorConnectAssets';
+import ConnectFX from './ColorConnectFX';
 
 // The Color Connect grid: draws cells, lines and dots, and turns finger
 // movement into cell events. It holds no game state — the screen passes the
@@ -12,7 +14,7 @@ import { DOT_COLORS, walkBetween, isConnected } from '../utils/colorConnect';
 //   onUp()        finger lifted / gesture cancelled
 // `size` is the board width in px; cells are size / n.
 function ColorConnectBoard({
-  n, dots, paths, size, disabled, activeColor, headCell, sparkles, winPulse,
+  n, dots, paths, size, disabled, activeColor, headCell, sparkles, winPulse, connects = [],
   onDown, onEnter, onUp,
 }) {
   const cs = size / n;
@@ -58,48 +60,13 @@ function ColorConnectBoard({
 
   const center = (cell) => [((cell % n) + 0.5) * cs, (Math.floor(cell / n) + 0.5) * cs];
 
-  const tint = [];
-  paths.forEach((p, k) => p.forEach((cell) => {
-    tint.push(
-      <Rect key={`t${cell}`} x={(cell % n) * cs} y={Math.floor(cell / n) * cs} width={cs} height={cs}
-        fill={DOT_COLORS[k]} fillOpacity={0.2} />,
-    );
-  }));
+  // One memoised layer per colour: applyDrag keeps the arrays of untouched
+  // colours as-is, so while you drag only the line under your finger redraws.
+  const lines = paths.map((p, k) => <LineLayer key={`l${k}`} path={p} color={k} n={n} cs={cs} />);
 
-  const grid = [];
-  for (let i = 1; i < n; i++) {
-    grid.push(<Line key={`h${i}`} x1={0} y1={i * cs} x2={size} y2={i * cs} stroke="#FFFFFF" strokeOpacity={0.14} strokeWidth={1} />);
-    grid.push(<Line key={`v${i}`} x1={i * cs} y1={0} x2={i * cs} y2={size} stroke="#FFFFFF" strokeOpacity={0.14} strokeWidth={1} />);
-  }
-
-  const lines = paths.map((p, k) => {
-    if (p.length < 2) return null;
-    const pts = p.map((cell) => center(cell).join(',')).join(' ');
-    const common = { points: pts, fill: 'none', strokeLinecap: 'round', strokeLinejoin: 'round' };
-    return (
-      <React.Fragment key={`l${k}`}>
-        <Polyline {...common} stroke={DOT_COLORS[k]} strokeOpacity={0.25} strokeWidth={cs * 0.62} />
-        <Polyline {...common} stroke={DOT_COLORS[k]} strokeWidth={cs * 0.38} />
-        <Polyline {...common} stroke="#FFFFFF" strokeOpacity={0.3} strokeWidth={cs * 0.1} />
-      </React.Fragment>
-    );
-  });
-
-  const dotEls = dots.map(([a, b], k) => {
-    const done = isConnected(paths[k], dots[k]);
-    return [a, b].map((cell) => {
-      const [x, y] = center(cell);
-      return (
-        <React.Fragment key={`d${cell}`}>
-          <Circle cx={x} cy={y + cs * 0.04} r={cs * 0.36} fill="#000000" fillOpacity={0.35} />
-          {done && <Circle cx={x} cy={y} r={cs * 0.46} fill={DOT_COLORS[k]} fillOpacity={0.3} />}
-          <Circle cx={x} cy={y} r={cs * 0.34} fill={`url(#dot${k})`} />
-          <Circle cx={x - cs * 0.1} cy={y - cs * 0.1} r={cs * 0.08} fill="#FFFFFF" fillOpacity={0.7} />
-          {done && <Circle cx={x} cy={y} r={cs * 0.34} fill="none" stroke="#FFFFFF" strokeOpacity={0.85} strokeWidth={Math.max(1.5, cs * 0.05)} />}
-        </React.Fragment>
-      );
-    });
-  });
+  // Which pairs are linked, as a string, so the ball layer only redraws
+  // when a pair connects or breaks, not on every drag step.
+  const doneKey = dots.map((d, k) => (isConnected(paths[k], d) ? '1' : '0')).join('');
 
   const head = activeColor != null && headCell != null ? center(headCell) : null;
 
@@ -110,25 +77,23 @@ function ColorConnectBoard({
   return (
     <Animated.View style={{ width: size, height: size, transform: [{ scale: pulseScale }] }}>
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Svg width={size} height={size}>
-          <Defs>
-            {DOT_COLORS.map((c, k) => (
-              <RadialGradient key={k} id={`dot${k}`} cx="40%" cy="35%" r="70%">
-                <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.9" />
-                <Stop offset="0.35" stopColor={c} stopOpacity="1" />
-                <Stop offset="1" stopColor={c} stopOpacity="1" />
-              </RadialGradient>
-            ))}
-          </Defs>
-          <Rect x={0} y={0} width={size} height={size} fill="#0B2B33" />
-          {tint}
-          {grid}
+        <CellLayer n={n} cs={cs} />
+        <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
           {lines}
-          {head && <Circle cx={head[0]} cy={head[1]} r={cs * 0.7} fill={DOT_COLORS[activeColor]} fillOpacity={0.22} />}
-          {dotEls}
         </Svg>
+        {head && (
+          <View style={{
+            position: 'absolute', left: head[0] - cs * 0.7, top: head[1] - cs * 0.7, width: cs * 1.4, height: cs * 1.4,
+            borderRadius: cs, backgroundColor: DOT_COLORS[activeColor], opacity: 0.22,
+          }} />
+        )}
+        <DotLayer dots={dots} doneKey={doneKey} n={n} cs={cs} />
         {sparkles.map((sp) => (
           <Sparkle key={sp.id} x={center(sp.cell)[0]} y={center(sp.cell)[1]} color={DOT_COLORS[sp.color]} cs={cs} />
+        ))}
+        {connects.map((fx) => (
+          <ConnectFX key={fx.id} path={fx.path} color={fx.color} n={n} cs={cs}
+            linePath={roundedPath(fx.path.map(center), cs * 0.32)} />
         ))}
       </View>
       {/* Touch layer on top; everything under it ignores touches. */}
@@ -136,6 +101,75 @@ function ColorConnectBoard({
     </Animated.View>
   );
 }
+
+// One colour's neon tube: soft outer glow layers, a solid coloured tube and
+// a bright near-white core, with rounded corners where the path turns.
+const LineLayer = React.memo(function LineLayer({ path, color, n, cs }) {
+  if (path.length < 2) return null;
+  const d = roundedPath(path.map((cell) => [((cell % n) + 0.5) * cs, (Math.floor(cell / n) + 0.5) * cs]), cs * 0.32);
+  const c = DOT_COLORS[color];
+  const common = { d, fill: 'none', strokeLinecap: 'round', strokeLinejoin: 'round' };
+  return (
+    <>
+      <Path {...common} stroke={c} strokeOpacity={0.1} strokeWidth={cs * 0.58} />
+      <Path {...common} stroke={c} strokeOpacity={0.3} strokeWidth={cs * 0.32} />
+      <Path {...common} stroke={c} strokeWidth={cs * 0.18} />
+      <Path {...common} stroke="#FFFFFF" strokeOpacity={0.65} strokeWidth={cs * 0.07} />
+    </>
+  );
+});
+
+// The glossy balls, with a coloured halo once a pair is linked.
+const DotLayer = React.memo(function DotLayer({ dots, doneKey, n, cs }) {
+  const ball = cs * 0.52;
+  return dots.map(([a, b], k) => {
+    const done = doneKey[k] === '1';
+    return [a, b].map((cell) => {
+      const x = ((cell % n) + 0.5) * cs, y = (Math.floor(cell / n) + 0.5) * cs;
+      return (
+        <React.Fragment key={`d${cell}`}>
+          {done && (
+            <View style={{
+              position: 'absolute', left: x - cs * 0.33, top: y - cs * 0.33, width: cs * 0.66, height: cs * 0.66,
+              borderRadius: cs, backgroundColor: DOT_COLORS[k], opacity: 0.4,
+            }} />
+          )}
+          <Image source={DOT_IMAGES[k]} fadeDuration={0}
+            style={{ position: 'absolute', left: x - ball / 2, top: y - ball / 2, width: ball, height: ball }} />
+        </React.Fragment>
+      );
+    });
+  });
+});
+
+// SVG path through cell centres with each 90° turn rounded off by radius r
+// (a quadratic curve that uses the corner as its control point).
+function roundedPath(pts, r) {
+  let d = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [px, py] = pts[i - 1], [x, y] = pts[i], [nx, ny] = pts[i + 1];
+    const straight = (px === x && x === nx) || (py === y && y === ny);
+    if (straight) { d += ` L${x},${y}`; continue; }
+    const ax = x + Math.sign(px - x) * r, ay = y + Math.sign(py - y) * r;
+    const bx = x + Math.sign(nx - x) * r, by = y + Math.sign(ny - y) * r;
+    d += ` L${ax},${ay} Q${x},${y} ${bx},${by}`;
+  }
+  const [lx, ly] = pts[pts.length - 1];
+  return `${d} L${lx},${ly}`;
+}
+
+// The neon glass cell art tiled n×n. Memoised: it only changes with the grid
+// size, not on every drag step.
+const CellLayer = React.memo(function CellLayer({ n, cs }) {
+  const cells = [];
+  for (let i = 0; i < n * n; i++) {
+    cells.push(
+      <Image key={i} source={NEON_CELL} fadeDuration={0} resizeMode="stretch"
+        style={{ position: 'absolute', left: (i % n) * cs, top: Math.floor(i / n) * cs, width: cs, height: cs }} />,
+    );
+  }
+  return <>{cells}</>;
+});
 
 // A little burst of light where a pair was just connected.
 const RAYS = 6;

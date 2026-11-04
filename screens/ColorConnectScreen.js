@@ -1,19 +1,23 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
-  View, StyleSheet, StatusBar, Animated, Pressable, ScrollView, AppState, Dimensions,
+  View, Image, StyleSheet, StatusBar, Animated, Pressable, AppState, Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Defs, Pattern, Rect, Circle, Path } from 'react-native-svg';
 import { Text } from '../components/AppText';
 import BackButton from '../components/BackButton';
 import ColorConnectBoard from '../components/ColorConnectBoard';
 import ColorConnectComplete from '../components/ColorConnectComplete';
 import ColorConnectLoading from '../components/ColorConnectLoading';
+import ColorConnectLevels from '../components/ColorConnectLevels';
+import { CONNECT_FX_MS } from '../components/ColorConnectFX';
 import {
   makeLevel, tierFor, emptyPaths, beginDrag, extendDrag, applyDrag, tidy, isConnected,
   progressOf, validateBoard, applyHint,
 } from '../utils/colorConnect';
 import { LEVELS } from '../utils/colorConnectLevels';
+import { SvgXml } from 'react-native-svg';
+import { FOREST_BG } from '../utils/colorConnectAssets';
+import { UNDO_SVG, RESTART_SVG, HINT_SVG, ALARM_SVG } from '../utils/colorConnectIcons';
 import {
   playTap, playMatch, playWin, playLocked, isSfxEnabled, setSfxEnabled, subscribeSfx,
 } from '../utils/audioManager';
@@ -22,17 +26,12 @@ import { isMusicEnabled, setMusicEnabled, subscribeMusic } from '../utils/backgr
 import { STORAGE_KEYS, loadNumber, saveNumber, loadJSON, saveJSON } from '../utils/storage';
 import { notifyLevelReached } from '../utils/notifications';
 import { maybeAskForRating } from '../utils/rating';
-import { showInterstitial, noteLevelComplete, runAfterLevelAd } from '../utils/interstitialAd';
+import { showInterstitial, noteLevelComplete, runAfterLevelAd, isAdShowing } from '../utils/interstitialAd';
 import { LEVEL_FONT } from '../utils/fonts';
 import { useBackHandler } from '../utils/useBackHandler';
 
 const LEVEL_COUNT = LEVELS.length;
 const { width: SW } = Dimensions.get('window');
-const HIT = { top: 12, bottom: 12, left: 12, right: 12 };
-const TIERS = [
-  { from: 1, to: 10 }, { from: 11, to: 30 }, { from: 31, to: 60 }, { from: 61, to: LEVEL_COUNT },
-];
-
 const fmtTime = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 const samePaths = (a, b) => a.length === b.length && a.every((p, k) => p.length === b[k].length && p.every((c, i) => c === b[k][i]));
 
@@ -40,28 +39,41 @@ const samePaths = (a, b) => a.length === b.length && a.every((p, k) => p.length 
 let globalUnlocked = 1;
 
 // ── Shared look ───────────────────────────────────────────────────────────
-// Teal gradient with a faint dotted/diagonal texture over it.
-function Backdrop() {
+// Glowing forest art, sized by hand rather than with resizeMode (Android was
+// showing it heavily zoomed in). The backdrop measures itself, then scales
+// the picture by exactly the amount needed to cover that box: the image keeps
+// its true proportions, is centred, and only the sliver that doesn't fit the
+// phone's shape is trimmed, so the whole forest stays in view on every phone.
+// A light dark wash at the top and bottom keeps the HUD and buttons readable.
+const BG_W = 736;
+const BG_H = 1600;
+const Backdrop = React.memo(function Backdrop() {
+  const [box, setBox] = useState(null);
+  let img = null;
+  if (box) {
+    const scale = Math.max(box.w / BG_W, box.h / BG_H);
+    const w = Math.ceil(BG_W * scale), h = Math.ceil(BG_H * scale);
+    img = { position: 'absolute', width: w, height: h, left: (box.w - w) / 2, top: (box.h - h) / 2 };
+  }
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <LinearGradient colors={['#2CC9BF', '#139AA0', '#0B6A78']} style={StyleSheet.absoluteFill} />
-      <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
-        <Defs>
-          <Pattern id="ccTex" width={28} height={28} patternUnits="userSpaceOnUse">
-            <Circle cx={7} cy={7} r={2} fill="#FFFFFF" fillOpacity={0.09} />
-            <Circle cx={21} cy={21} r={1.2} fill="#FFFFFF" fillOpacity={0.07} />
-            <Path d="M0 28 L28 0" stroke="#000000" strokeOpacity={0.05} strokeWidth={1} />
-          </Pattern>
-        </Defs>
-        <Rect x={0} y={0} width="100%" height="100%" fill="url(#ccTex)" />
-      </Svg>
+    <View
+      style={[StyleSheet.absoluteFill, { overflow: 'hidden', backgroundColor: '#1A0B3D' }]}
+      pointerEvents="none"
+      onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
+    >
+      {img && <Image source={FOREST_BG} resizeMode="stretch" fadeDuration={0} style={img} />}
+      <LinearGradient
+        colors={['rgba(12,6,40,0.55)', 'rgba(12,6,40,0.05)', 'rgba(12,6,40,0.05)', 'rgba(12,6,40,0.6)']}
+        locations={[0, 0.25, 0.7, 1]}
+        style={StyleSheet.absoluteFill}
+      />
     </View>
   );
-}
+});
 
 // RN Text has no stroke, so the dark outline is the same text stacked at
 // small offsets behind the white face.
-function OutlinedText({ children, size, color = '#FFFFFF', stroke = '#07444D', style }) {
+const OutlinedText = React.memo(function OutlinedText({ children, size, color = '#FFFFFF', stroke = '#2A0E5C', style }) {
   const w = Math.max(1.5, size * 0.06);
   const offsets = [[-w, 0], [w, 0], [0, -w], [0, w], [-w, -w], [w, -w], [-w, w], [w, w], [0, w * 2]];
   const base = { fontSize: size, ...LEVEL_FONT, textAlign: 'center', letterSpacing: 1 };
@@ -73,7 +85,7 @@ function OutlinedText({ children, size, color = '#FFFFFF', stroke = '#07444D', s
       <Text style={[base, { color }]}>{children}</Text>
     </View>
   );
-}
+});
 
 // Chunky candy button: darker base under a glossy gradient face.
 function CandyButton({ label, colors, base, onPress, disabled, style, textSize = 20 }) {
@@ -91,17 +103,24 @@ function CandyButton({ label, colors, base, onPress, disabled, style, textSize =
   );
 }
 
-function RoundIconButton({ label, onPress }) {
+// Alarm art next to the timer; memoised so the SVG (with its blur filter)
+// isn't rebuilt on every drag step or timer tick.
+const AlarmIcon = React.memo(function AlarmIcon() {
+  return <SvgXml xml={ALARM_SVG} width={40} height={40} style={s.timerIcon} />;
+});
+
+// Glossy round icon button (header actions).
+const IconButton = React.memo(function IconButton({ xml, onPress, disabled }) {
   return (
-    <Pressable onPress={onPress} hitSlop={HIT}>
+    <Pressable onPress={onPress} disabled={disabled} hitSlop={6}>
       {({ pressed }) => (
-        <View style={[s.roundBtn, pressed && { transform: [{ scale: 0.92 }] }]}>
-          <Text style={s.roundBtnTxt}>{label}</Text>
+        <View style={[s.iconBtn, pressed && { transform: [{ scale: 0.9 }] }, disabled && { opacity: 0.45 }]}>
+          <SvgXml xml={xml} width="100%" height="100%" />
         </View>
       )}
     </Pressable>
   );
-}
+});
 
 function Toggle({ label, on, onChange }) {
   return (
@@ -120,37 +139,11 @@ function useSetting(get, subscribe) {
   return v;
 }
 
-// ── Level select ──────────────────────────────────────────────────────────
-const LV_COLS = 5;
-const LV_GAP = 10;
-const LV_SIZE = Math.floor((Math.min(SW, 480) - 32 - LV_GAP * (LV_COLS - 1)) / LV_COLS);
-
-function LevelTile({ num, state, perfect, onPress }) {
-  const locked = state === 'locked';
-  const current = state === 'current';
-  const solved = state === 'solved';
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.92 : 1 }] }]}>
-      <View style={[
-        s.lvTile,
-        solved && s.lvSolved,
-        current && s.lvCurrent,
-        locked && s.lvLocked,
-      ]}>
-        {locked
-          ? <Text style={s.lvLock}>🔒</Text>
-          : <Text style={[s.lvNum, current && { color: '#07444D' }]}>{num}</Text>}
-        {solved && <Text style={s.lvBadge}>{perfect ? '★' : '✓'}</Text>}
-      </View>
-    </Pressable>
-  );
-}
-
 // ── Main screen ───────────────────────────────────────────────────────────
 export default function ColorConnectScreen({ onBack }) {
-  const [view, setView] = useState('loading'); // 'loading' | 'menu' | 'levels' | 'game'
+  const [view, setView] = useState('loading'); // 'loading' | 'levels' | 'game'
   const [maxUnlocked, setMaxUnlocked] = useState(globalUnlocked);
-  const [solved, setSolved] = useState({}); // { [levelNum]: 1 solved | 2 perfect }
+  const [solved, setSolved] = useState({}); // { [levelNum]: stars 1–3 }
 
   const [levelNum, setLevelNum] = useState(1);
   const [level, setLevel] = useState(null); // { n, dots, solution }
@@ -166,6 +159,7 @@ export default function ColorConnectScreen({ onBack }) {
   const [activeColor, setActiveColor] = useState(null);
   const [headCell, setHeadCell] = useState(null);
   const [sparkles, setSparkles] = useState([]);
+  const [connects, setConnects] = useState([]); // pair-connected celebrations playing
   const [boardArea, setBoardArea] = useState(null);
 
   const sfxOn = useSetting(isSfxEnabled, subscribeSfx);
@@ -173,15 +167,24 @@ export default function ColorConnectScreen({ onBack }) {
   const winPulse = useRef(new Animated.Value(0)).current;
 
   useBackHandler(() => {
-    if (view === 'game') { setPaused(false); setView('levels'); } else if (view === 'levels') setView('menu');
-    else onBack();
+    if (view === 'game') { setPaused(false); setView('levels'); } else onBack();
   });
 
   useEffect(() => {
     loadNumber(STORAGE_KEYS.COLORCONNECT_MAX_UNLOCKED, 1).then((saved) => {
       if (saved > globalUnlocked) { globalUnlocked = saved; setMaxUnlocked(saved); }
     });
-    loadJSON(STORAGE_KEYS.COLORCONNECT_SOLVED, {}).then((saved) => setSolved(saved || {}));
+    Promise.all([
+      loadJSON(STORAGE_KEYS.COLORCONNECT_STARS, {}),
+      loadJSON(STORAGE_KEYS.COLORCONNECT_SOLVED, {}),
+    ]).then(([stars, old]) => {
+      // Levels solved before stars existed: perfect → 3, solved → 2.
+      const merged = { ...(stars || {}) };
+      Object.entries(old || {}).forEach(([num, grade]) => {
+        if (!merged[num]) merged[num] = grade === 2 ? 3 : 2;
+      });
+      setSolved(merged);
+    });
   }, []);
 
   // Everything the drag handlers need, read through a ref so the handlers
@@ -196,6 +199,13 @@ export default function ColorConnectScreen({ onBack }) {
     const items = cells.map((cell) => ({ id: ++sparkleId.current, cell, color }));
     setSparkles((sp) => [...sp, ...items]);
     setTimeout(() => setSparkles((sp) => sp.filter((x) => !items.includes(x))), 800);
+  }, []);
+
+  // Full celebration when a pair gets connected (see ColorConnectFX).
+  const celebrate = useCallback((color, path) => {
+    const fx = { id: ++sparkleId.current, color, path };
+    setConnects((cur) => [...cur.filter((x) => x.color !== color), fx]);
+    setTimeout(() => setConnects((cur) => cur.filter((x) => x !== fx)), CONNECT_FX_MS);
   }, []);
 
   const startLevel = useCallback((num) => {
@@ -218,6 +228,7 @@ export default function ColorConnectScreen({ onBack }) {
       setActiveColor(null);
       setHeadCell(null);
       setSparkles([]);
+      setConnects([]);
       winPulse.setValue(0);
       setView('game');
     });
@@ -237,10 +248,11 @@ export default function ColorConnectScreen({ onBack }) {
     lv.dots.forEach(([a, b], k) => sparkle(k, [a, b]));
     const perfect = !hinted && mv <= lv.dots.length;
     setSolved((prev) => {
-      const grade = perfect ? 2 : 1;
-      if ((prev[num] || 0) >= grade) return prev;
-      const next = { ...prev, [num]: grade };
-      saveJSON(STORAGE_KEYS.COLORCONNECT_SOLVED, next);
+      // Same stars as the level-complete popup; keep the best ever.
+      const stars = perfect ? 3 : hinted ? 1 : 2;
+      if ((prev[num] || 0) >= stars) return prev;
+      const next = { ...prev, [num]: stars };
+      saveJSON(STORAGE_KEYS.COLORCONNECT_STARS, next);
       return next;
     });
     const nextUnlock = Math.min(LEVEL_COUNT, num + 1);
@@ -292,9 +304,10 @@ export default function ColorConnectScreen({ onBack }) {
     setHeadCell(path[path.length - 1]);
     if (!wasDone && isConnected(path, lv.dots[d.color])) {
       playMatch();
-      sparkle(d.color, lv.dots[d.color]);
+      hapticTap();
+      celebrate(d.color, path);
     }
-  }, [sparkle]);
+  }, [celebrate]);
 
   const onUp = useCallback(() => {
     const d = drag.current;
@@ -340,10 +353,10 @@ export default function ColorConnectScreen({ onBack }) {
       if (!h) return;
       setUsedHint(true);
       playMatch();
-      sparkle(h.color, lv.dots[h.color]);
+      celebrate(h.color, h.paths[h.color]);
       commit(h.paths, cur, true);
     });
-  }, [busy, sparkle, commit]);
+  }, [busy, celebrate, commit]);
 
   // ── Timer + auto-pause ──────────────────────────────────────────────────
   useEffect(() => {
@@ -354,6 +367,9 @@ export default function ColorConnectScreen({ onBack }) {
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (st) => {
+      // An ad (e.g. from the hint button) also backgrounds the app; don't
+      // pause for that, or the hint's line ends up hidden behind PAUSED.
+      if (isAdShowing()) return;
       if (st !== 'active' && view === 'game' && !g.current.complete && !g.current.winning) setPaused(true);
     });
     return () => sub.remove();
@@ -364,57 +380,13 @@ export default function ColorConnectScreen({ onBack }) {
     [level, board],
   );
 
-  const solvedCount = Object.keys(solved).length;
   const continueLevel = Math.min(maxUnlocked, LEVEL_COUNT);
 
-  const onLoaded = useCallback(() => setView('menu'), []);
+  // After the loading splash, go straight to the level list.
+  const onLoaded = useCallback(() => setView('levels'), []);
 
   // ── Loading splash ──────────────────────────────────────────────────────
   if (view === 'loading') return <ColorConnectLoading onDone={onLoaded} />;
-
-  // ── Menu ────────────────────────────────────────────────────────────────
-  if (view === 'menu') {
-    const preview = makeLevel(LEVELS[0]);
-    return (
-      <View style={s.root}>
-        <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
-        <Backdrop />
-        <View style={s.topBar}>
-          <BackButton onPress={() => { playTap(); onBack(); }} />
-          <View />
-        </View>
-        <ScrollView contentContainerStyle={s.menuBody} bounces={false}>
-          <OutlinedText size={Math.min(52, SW * 0.13)}>COLOR</OutlinedText>
-          <OutlinedText size={Math.min(52, SW * 0.13)} style={{ marginTop: -8 }}>CONNECT</OutlinedText>
-          <Text style={s.tagline}>Link the dots · Fill every cell</Text>
-
-          <View style={[s.boardFrame, { marginTop: 22 }]}>
-            <ColorConnectBoard
-              n={preview.n} dots={preview.dots} paths={preview.solution} size={Math.min(220, SW - 120)}
-              disabled sparkles={[]} onDown={() => {}} onEnter={() => {}} onUp={() => {}}
-            />
-          </View>
-
-          <CandyButton
-            label={maxUnlocked > 1 ? `▶ CONTINUE · LEVEL ${continueLevel}` : '▶ START GAME'}
-            colors={['#FFE36A', '#FFC21A']} base="#C78A00" textSize={22}
-            onPress={() => { playTap(); startLevel(continueLevel); }}
-            style={s.menuBtn}
-          />
-          <CandyButton
-            label="LEVELS" colors={['#9FC2FF', '#5B8DEF']} base="#2E4E93"
-            onPress={() => { playTap(); setView('levels'); }}
-            style={s.menuBtn}
-          />
-          <View style={s.menuToggles}>
-            <Toggle label="🔊 Sound" on={sfxOn} onChange={setSfxEnabled} />
-            <Toggle label="🎵 Music" on={musicOn} onChange={setMusicEnabled} />
-          </View>
-          <Text style={s.menuProgress}>Solved {solvedCount}/{LEVEL_COUNT}</Text>
-        </ScrollView>
-      </View>
-    );
-  }
 
   // ── Level select ────────────────────────────────────────────────────────
   if (view === 'levels') {
@@ -422,41 +394,15 @@ export default function ColorConnectScreen({ onBack }) {
       <View style={s.root}>
         <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
         <Backdrop />
-        <View style={s.topBar}>
-          <BackButton onPress={() => { playTap(); setView('menu'); }} />
-          <OutlinedText size={26}>LEVELS</OutlinedText>
-          <View style={s.countPill}><Text style={s.countTxt}>{solvedCount}/{LEVEL_COUNT}</Text></View>
-        </View>
-        <ScrollView contentContainerStyle={s.levelsBody}>
-          {TIERS.map(({ from, to }) => {
-            const tier = tierFor(from);
-            const nums = [];
-            for (let i = from; i <= to; i++) nums.push(i);
-            return (
-              <View key={from} style={{ marginBottom: 18 }}>
-                <View style={s.tierHead}>
-                  <View style={[s.tierDot, { backgroundColor: tier.color }]} />
-                  <Text style={s.tierName}>{tier.name}</Text>
-                  <Text style={s.tierRange}>{from}–{to} · {LEVELS[from - 1].n}×{LEVELS[from - 1].n} to {LEVELS[to - 1].n}×{LEVELS[to - 1].n}</Text>
-                </View>
-                <View style={s.lvGrid}>
-                  {nums.map((num) => {
-                    const state = solved[num] ? 'solved' : num === continueLevel ? 'current' : num <= maxUnlocked ? 'open' : 'locked';
-                    return (
-                      <LevelTile
-                        key={num} num={num} state={state} perfect={solved[num] === 2}
-                        onPress={() => {
-                          if (state === 'locked') playLocked();
-                          else { playTap(); startLevel(num); }
-                        }}
-                      />
-                    );
-                  })}
-                </View>
-              </View>
-            );
-          })}
-        </ScrollView>
+        <ColorConnectLevels
+          levelCount={LEVEL_COUNT}
+          stars={solved}
+          maxUnlocked={maxUnlocked}
+          current={continueLevel}
+          onPick={(num) => { playTap(); startLevel(num); }}
+          onLocked={playLocked}
+          onBack={() => { playTap(); onBack(); }}
+        />
       </View>
     );
   }
@@ -472,11 +418,13 @@ export default function ColorConnectScreen({ onBack }) {
   else if (allConnected && left > 0) {
     status = `All pairs connected, but ${left} empty cell${left > 1 ? 's' : ''} left. Fill every box!`;
     statusStyle = s.statusWarn;
-  } else if (moves === 0) status = '👆 Drag between matching dots. Fill every cell!';
-  else status = `${progress.connected}/${progress.pairs} pairs connected`;
+  } else if (moves === 0) {
+    // The how-to-play tip is only for the first few levels.
+    status = levelNum <= 5 ? '👆 Drag between matching dots. Fill every cell!' : null;
+  } else status = `${progress.connected}/${progress.pairs} pairs connected`;
 
   const size = boardArea
-    ? Math.floor(Math.min(boardArea.w - 20, boardArea.h - 20, 520) / level.n) * level.n
+    ? Math.floor((Math.min(boardArea.w - 20, boardArea.h - 20, 520) * 0.85) / level.n) * level.n
     : 0;
 
   return (
@@ -490,38 +438,29 @@ export default function ColorConnectScreen({ onBack }) {
           <OutlinedText size={26}>LEVEL {levelNum}</OutlinedText>
           <Text style={[s.tierTag, { color: tier.color }]}>{tier.name} · {level.n}×{level.n}</Text>
         </View>
-        <RoundIconButton label="❚❚" onPress={() => { playTap(); if (!winning && !complete) setPaused(true); }} />
+        {/* Same width as the back button so the title stays centred. */}
+        <View style={{ width: 46 }} />
       </View>
 
-      <View style={s.stats}>
-        <View style={{ flex: 1.4 }}>
-          <View style={s.fillRow}>
-            <Text style={s.statLabel}>FILLED</Text>
-            <Text style={s.fillValue}>{progress.filled}/{progress.total}</Text>
-          </View>
-          <View style={s.barTrack}>
-            <View style={[s.barFill, { width: `${(progress.filled / progress.total) * 100}%` }, left === 0 && { backgroundColor: '#7CF29A' }]} />
-          </View>
-        </View>
-        <View style={s.statDivider} />
-        <View style={s.statItem}>
-          <Text style={s.statLabel}>PAIRS</Text>
-          <Text style={s.statValue}>{progress.connected}/{progress.pairs}</Text>
-        </View>
-        <View style={s.statItem}>
-          <Text style={s.statLabel}>MOVES</Text>
-          <Text style={s.statValue}>{moves}</Text>
-        </View>
-        <View style={s.statItem}>
-          <Text style={s.statLabel}>TIME</Text>
-          <Text style={s.statValue}>{fmtTime(elapsed)}</Text>
+      <View style={s.actions}>
+        <IconButton xml={UNDO_SVG} onPress={undo} disabled={busy || !history.length} />
+        <IconButton xml={RESTART_SVG} onPress={restart} disabled={winning || complete} />
+        <IconButton xml={HINT_SVG} onPress={hint} disabled={busy} />
+      </View>
+
+      <View style={s.timerWrap}>
+        <View style={s.timerPill}>
+          <AlarmIcon />
+          <OutlinedText size={28} color="#FFE36A" stroke="#3A1400" style={s.timerTxt}>{fmtTime(elapsed)}</OutlinedText>
         </View>
       </View>
 
       <View style={s.statusWrap}>
-        <View style={[s.statusPill, statusStyle]}>
-          <Text style={s.statusTxt}>{status}</Text>
-        </View>
+        {status && (
+          <View style={[s.statusPill, statusStyle]}>
+            <Text style={s.statusTxt}>{status}</Text>
+          </View>
+        )}
       </View>
 
       <View style={s.boardArea} onLayout={(e) => {
@@ -533,20 +472,11 @@ export default function ColorConnectScreen({ onBack }) {
             <ColorConnectBoard
               n={level.n} dots={level.dots} paths={board} size={size}
               disabled={busy} activeColor={activeColor} headCell={headCell}
-              sparkles={sparkles} winPulse={winPulse}
+              sparkles={sparkles} winPulse={winPulse} connects={connects}
               onDown={onDown} onEnter={onEnter} onUp={onUp}
             />
           </View>
         )}
-      </View>
-
-      <View style={s.controls}>
-        <CandyButton label="↶ UNDO" colors={['#7FD0FF', '#3A9BF0']} base="#1A5BA8"
-          onPress={undo} disabled={busy || !history.length} style={s.ctrlBtn} textSize={17} />
-        <CandyButton label="↻ RESTART" colors={['#FF9B9B', '#F0506E']} base="#A8203E"
-          onPress={restart} disabled={winning || complete} style={s.ctrlBtn} textSize={17} />
-        <CandyButton label="💡 HINT" colors={['#FFE36A', '#FFB400']} base="#B86400"
-          onPress={hint} disabled={busy} style={s.ctrlBtn} textSize={17} />
       </View>
 
       {paused && (
@@ -588,7 +518,7 @@ export default function ColorConnectScreen({ onBack }) {
 
 // ── Styles ────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#139AA0' },
+  root: { flex: 1, backgroundColor: '#1A0B3D' },
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingTop: 50, paddingBottom: 8,
@@ -598,12 +528,6 @@ const s = StyleSheet.create({
   candyFace: { borderRadius: 18, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   candyShine: { position: 'absolute', top: 4, left: 10, right: 10, height: 10, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.35)' },
   candyTxt: { ...LEVEL_FONT, color: '#FFFFFF', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 1 },
-  roundBtn: {
-    width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#0B5E68', borderWidth: 3, borderColor: '#BFF5EF',
-    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 4, shadowOffset: { width: 0, height: 3 }, elevation: 5,
-  },
-  roundBtnTxt: { fontSize: 16, color: '#FFFFFF', fontWeight: '900', letterSpacing: -2 },
   toggleRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingVertical: 8, paddingHorizontal: 14, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.2)',
@@ -614,67 +538,28 @@ const s = StyleSheet.create({
   knob: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFFFFF' },
   knobOn: { transform: [{ translateX: 20 }] },
 
-  // Menu
-  menuBody: { alignItems: 'center', paddingHorizontal: 24, paddingBottom: 30 },
-  tagline: { fontSize: 15, fontWeight: '800', color: '#E4FFFB', marginTop: 6, letterSpacing: 0.5 },
-  menuBtn: { alignSelf: 'stretch', marginTop: 16, maxWidth: 360, width: '100%' },
-  menuToggles: { flexDirection: 'row', gap: 10, marginTop: 20, flexWrap: 'wrap', justifyContent: 'center' },
-  menuProgress: { fontSize: 14, ...LEVEL_FONT, color: '#E4FFFB', marginTop: 16 },
-
-  // Level select
-  countPill: { minWidth: 70, alignItems: 'center', borderRadius: 16, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: '#0B5E68', borderWidth: 2, borderColor: '#BFF5EF' },
-  countTxt: { fontSize: 15, ...LEVEL_FONT, color: '#FFE36A' },
-  levelsBody: { paddingHorizontal: 16, paddingBottom: 40, alignItems: 'center' },
-  tierHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, width: LV_SIZE * LV_COLS + LV_GAP * (LV_COLS - 1) },
-  tierDot: { width: 12, height: 12, borderRadius: 6, marginRight: 8 },
-  tierName: { fontSize: 18, ...LEVEL_FONT, color: '#FFFFFF', marginRight: 8 },
-  tierRange: { fontSize: 12, fontWeight: '700', color: '#CFFAF5' },
-  lvGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: LV_GAP, width: LV_SIZE * LV_COLS + LV_GAP * (LV_COLS - 1) },
-  lvTile: {
-    width: LV_SIZE, height: LV_SIZE, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#0B5E68', borderWidth: 2, borderColor: 'rgba(191,245,239,0.6)',
-  },
-  lvSolved: { backgroundColor: '#1F8F6A', borderColor: '#7CF29A' },
-  lvCurrent: { backgroundColor: '#FFE36A', borderColor: '#FFFFFF', borderWidth: 3 },
-  lvLocked: { backgroundColor: 'rgba(5,50,58,0.55)', borderColor: 'rgba(191,245,239,0.2)' },
-  lvNum: { fontSize: LV_SIZE * 0.38, ...LEVEL_FONT, color: '#FFFFFF' },
-  lvLock: { fontSize: LV_SIZE * 0.32, opacity: 0.7 },
-  lvBadge: { position: 'absolute', top: 2, right: 6, fontSize: 12, color: '#FFE36A', fontWeight: '900' },
-
   // Game
   tierTag: { fontSize: 11, fontWeight: '900', letterSpacing: 1, marginTop: 2 },
-  stats: {
-    flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 4,
-    paddingVertical: 8, paddingHorizontal: 12, borderRadius: 18,
-    backgroundColor: 'rgba(5,50,58,0.55)', borderWidth: 2, borderColor: 'rgba(191,245,239,0.45)',
-  },
-  fillRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  fillValue: { fontSize: 18, ...LEVEL_FONT, color: '#FFFFFF' },
-  barTrack: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.18)', marginTop: 4, overflow: 'hidden' },
-  barFill: { height: 8, borderRadius: 4, backgroundColor: '#FFE36A' },
-  statDivider: { width: 2, height: 30, borderRadius: 1, backgroundColor: 'rgba(191,245,239,0.3)', marginHorizontal: 10 },
-  statItem: { flex: 1, alignItems: 'center' },
-  statLabel: { fontSize: 10, ...LEVEL_FONT, color: '#8FD9D1', letterSpacing: 0.8 },
-  statValue: { fontSize: 17, ...LEVEL_FONT, color: '#FFFFFF' },
-  statusWrap: { minHeight: 50, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 },
-  statusPill: { borderRadius: 14, paddingVertical: 6, paddingHorizontal: 14, backgroundColor: 'rgba(5,50,58,0.6)' },
+  statusWrap: { minHeight: 40, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 },
+  statusPill: { borderRadius: 14, paddingVertical: 6, paddingHorizontal: 14, backgroundColor: 'rgba(24,10,64,0.72)' },
   statusWarn: { backgroundColor: 'rgba(200,110,0,0.9)' },
   statusTxt: { color: '#FFFFFF', fontSize: 13, fontWeight: '800', textAlign: 'center' },
-  boardArea: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
-  boardFrame: {
-    padding: 6, borderRadius: 16, backgroundColor: '#07444D',
-    borderWidth: 3, borderColor: '#BFF5EF',
-    shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 6 }, elevation: 10,
-  },
-  controls: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 18 },
-  ctrlBtn: { flex: 1 },
+  boardArea: { flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 4, paddingHorizontal: 6, paddingBottom: 16 },
+  // No tray: the neon cells sit straight on the forest background.
+  boardFrame: { padding: 6 },
+  actions: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 22, marginTop: 4 },
+  iconBtn: { width: 64, height: 64 },
+  timerWrap: { alignItems: 'center', marginTop: 10 },
+  timerPill: { flexDirection: 'row', alignItems: 'center' },
+  timerIcon: { marginRight: 2, marginTop: -4 },
+  timerTxt: {},
 
   // Pause
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(3,30,36,0.75)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(14,6,38,0.78)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   pauseCard: {
     width: '100%', maxWidth: 340, alignItems: 'center', borderRadius: 28, padding: 22,
-    backgroundColor: '#0F4C55', borderWidth: 3, borderColor: '#5FE3D6',
+    backgroundColor: '#24104F', borderWidth: 3, borderColor: '#B57BFF',
   },
-  pauseSub: { fontSize: 14, fontWeight: '700', color: '#BFF5EF', marginTop: 2, marginBottom: 6 },
+  pauseSub: { fontSize: 14, fontWeight: '700', color: '#E2D2FF', marginTop: 2, marginBottom: 6 },
   pauseBtn: { alignSelf: 'stretch', marginTop: 12 },
 });

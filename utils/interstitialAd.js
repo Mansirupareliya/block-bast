@@ -11,8 +11,16 @@ let retryDelay = 5000;
 let retryTimer = null;
 let gameOverCount = 0;
 let onClosedOnce = null; // callback for the ad currently on screen
+let adShowing = false;
+
+// True while a full-screen ad is up. Showing an ad sends the app to the
+// background, so games use this to avoid auto-pausing because of the ad.
+export function isAdShowing() {
+  return adShowing;
+}
 
 function finishShow() {
+  adShowing = false;
   const cb = onClosedOnce;
   onClosedOnce = null;
   cb?.();
@@ -65,6 +73,7 @@ export function preloadInterstitial() {
 export function showInterstitial(onDone) {
   if (interstitial && isLoaded) {
     isLoaded = false;
+    adShowing = true;
     levelsSinceAd = 0; // any ad shown restarts the every-3-levels count
     onClosedOnce = onDone || null;
     interstitial.show().catch((e) => {

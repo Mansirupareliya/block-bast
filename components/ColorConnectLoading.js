@@ -12,7 +12,7 @@ import Svg, {
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const FONT = 'LilitaOne';
-const DURATION = 2200;
+const DURATION = 900;
 const TITLE_W = Math.min(SW * 0.86, 380);
 
 // ── Clouds ────────────────────────────────────────────────────────────────
