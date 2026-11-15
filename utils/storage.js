@@ -18,9 +18,15 @@ export const STORAGE_KEYS = {
   BOXPUSHER_MAX_UNLOCKED: '@boxpusher:maxUnlockedLevel',
   LIGHTPATH_MAX_UNLOCKED: '@lightpath:maxUnlockedLevel',
   LIGHTPATH_STARS: '@lightpath:bestStars',
+  COLORCONNECT_MAX_UNLOCKED: '@colorconnect:maxUnlockedLevel',
+  COLORCONNECT_SOLVED: '@colorconnect:solved',
+  // { [levelNum]: stars 1–3 } — replaces COLORCONNECT_SOLVED (old saves are
+  // converted on load: 2 perfect → 3 stars, 1 solved → 2 stars).
+  COLORCONNECT_STARS: '@colorconnect:stars',
   FAVORITES: '@hub:favorites',
   DAILY_STREAK: '@hub:dailyStreak',
   MUSIC_ENABLED: '@hub:musicEnabled',
+  SFX_ENABLED: '@hub:sfxEnabled',
   VIBRATION_ENABLED: '@hub:vibrationEnabled',
   NOTIFICATIONS_ENABLED: '@hub:notificationsEnabled',
   REMINDER_PROGRESS: '@hub:reminderProgress',

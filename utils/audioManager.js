@@ -1,4 +1,5 @@
 import { hapticTap, hapticPlace, hapticSuccess, hapticFail } from './haptics';
+import { STORAGE_KEYS, loadJSON, saveJSON } from './storage';
 
 let AudioModule = null;
 
@@ -39,6 +40,32 @@ if (AudioModule) {
 // the rest of the app session, including on every later screen/level.
 // Reusing a fixed small set of players sidesteps that entirely.
 const POOL_SIZE = 3;
+
+// Sound-effects on/off (separate from background music and vibration),
+// persisted like the other settings. Off silences every play* helper below;
+// their vibrations still follow the vibration setting.
+let sfxEnabled = true;
+const sfxListeners = new Set();
+
+loadJSON(STORAGE_KEYS.SFX_ENABLED, true).then((saved) => {
+  sfxEnabled = saved;
+  sfxListeners.forEach((fn) => fn(sfxEnabled));
+});
+
+export function isSfxEnabled() {
+  return sfxEnabled;
+}
+
+export function setSfxEnabled(on) {
+  sfxEnabled = on;
+  saveJSON(STORAGE_KEYS.SFX_ENABLED, on);
+  sfxListeners.forEach((fn) => fn(on));
+}
+
+export function subscribeSfx(fn) {
+  sfxListeners.add(fn);
+  return () => sfxListeners.delete(fn);
+}
 const pools = new Map(); // assetPath (require() id) -> { players, index }
 
 const getPool = (assetPath) => {
@@ -71,7 +98,7 @@ const getPool = (assetPath) => {
 // each at a different rate/volume), a reused player must not keep the
 // previous caller's settings.
 const playSoundSafely = (assetPath, { volume = 1, rate = 1 } = {}) => {
-  if (!AudioModule) return;
+  if (!AudioModule || !sfxEnabled) return;
   try {
     const pool = getPool(assetPath);
     if (!pool.players.length) return;

@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { Text, TextInput } from '../components/AppText';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
-import { playTap } from '../utils/audioManager';
+import { playTap, isSfxEnabled, setSfxEnabled, subscribeSfx } from '../utils/audioManager';
 import { getPlayerName, setPlayerName, sanitizeName, getDeviceId, MAX_NAME_LENGTH } from '../utils/playerIdentity';
 import { STORAGE_KEYS, loadNumber } from '../utils/storage';
 import { submitProgress } from '../utils/leaderboardService';
@@ -39,6 +39,11 @@ function Icon({ name, size = 22, color = '#FFFFFF' }) {
         <Path d="M9 18V5l12-2v13" {...p} />
         <Circle cx="6" cy="18" r="3" {...p} fill={color} />
         <Circle cx="18" cy="16" r="3" {...p} fill={color} />
+      </>)}
+      {name === 'sound' && (<>
+        <Path d="M11 5L6 9H2v6h4l5 4V5z" {...p} fill={color} />
+        <Path d="M15.54 8.46a5 5 0 0 1 0 7.07" {...p} />
+        <Path d="M19.07 4.93a10 10 0 0 1 0 14.14" {...p} />
       </>)}
       {name === 'vibrate' && (<>
         <Rect x="7" y="3" width="10" height="18" rx="2" {...p} />
@@ -142,6 +147,7 @@ export default function SettingsScreen({ onBack, onSelect, likes = {}, onToggleL
   const [streakState, setStreakState] = useState(null);
   const [saved, setSaved] = useState(false);
 
+  const sfxOn = useSetting(isSfxEnabled, subscribeSfx);
   const musicOn = useSetting(isMusicEnabled, subscribeMusic);
   const vibrateOn = useSetting(isVibrationEnabled, subscribeVibration);
   const notifyOn = useSetting(isNotificationsEnabled, subscribeNotifications);
@@ -269,6 +275,7 @@ export default function SettingsScreen({ onBack, onSelect, likes = {}, onToggleL
 
                 {/* Sound / vibration / notification toggles */}
                 <View style={styles.toggleRow}>
+                  <RoundToggle icon="sound" label="Sound" on={sfxOn} onToggle={setSfxEnabled} />
                   <RoundToggle icon="music" label="Music" on={musicOn} onToggle={setMusicEnabled} />
                   <RoundToggle icon="vibrate" label="Vibration" on={vibrateOn} onToggle={setVibrationEnabled} />
                   <RoundToggle icon="bell" label="Alerts" on={notifyOn} onToggle={setNotificationsEnabled} />
@@ -447,7 +454,7 @@ const styles = StyleSheet.create({
   bigSub: { fontSize: 12, fontWeight: '800', color: 'rgba(255,255,255,0.92)', marginTop: 2 },
 
   // ── Toggles ──
-  toggleRow: { flexDirection: 'row', justifyContent: 'center', gap: 22, marginTop: 22 },
+  toggleRow: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginTop: 22 },
   roundInner: { width: 56, height: 50, alignItems: 'center', justifyContent: 'center' },
   slashWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   roundLabel: { fontSize: 11, fontWeight: '900', color: C.brownDim, marginTop: 5 },
