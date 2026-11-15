@@ -24,7 +24,7 @@
         "backgroundColor": "#0B2540"
       },
       "package": "com.mansirupareliyasteam.BlockBlast",
-      "versionCode": 3,
+      "versionCode": 4,
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.mansirupareliyasteam.BlockBlast",
       "permissions": [
         "android.permission.MODIFY_AUDIO_SETTINGS",
